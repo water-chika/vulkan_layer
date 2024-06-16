@@ -1,0 +1,18 @@
+{
+    "file_format_version" : "1.2.1",
+    "layer": {
+        "name": "VK_LAYER_WATER_CHIKA_debug",
+        "type": "INSTANCE",
+        "library_path": ".\\vk_water_chika_debug_layer.dll",
+        "library_arch" : "64",
+        "api_version" : "1.0.40",
+        "implementation_version" : "1",
+        "description" : "Water Chika's debug layer",
+        "functions": {
+            "vkNegotiateLoaderLayerInterfaceVersion":
+            "water_chika_debug_layer_NegotiateLoaderLayerInterfaceVersion",
+            "vkGetInstanceProcAddr":
+            "water_chika_debug_layer_GetInstanceProcAddr"
+        }
+    }
+}
