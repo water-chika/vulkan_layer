@@ -153,6 +153,29 @@ public:
 
         return layer.CreateGraphicsPipelines(pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
     }
+    VkResult CreateRayTracingPipelinesKHR(
+        VkDeferredOperationKHR deferredOperation,
+        VkPipelineCache pipelineCache,
+        uint32_t createInfoCount,
+        const VkRayTracingPipelineCreateInfoKHR* pCreateInfos,
+        const VkAllocationCallbacks* pAllocator,
+        VkPipeline* pPipelines
+    ) {
+        auto nextCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(get_next_device_proc_addr("vkCreateRayTracingPipelinesKHR"));
+        return nextCreateRayTracingPipelinesKHR(m_device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+    }
+    static VkResult CreateRayTracingPipelinesKHR(
+        VkDevice device,
+        VkDeferredOperationKHR deferredOperation,
+        VkPipelineCache pipelineCache,
+        uint32_t createInfoCount,
+        const VkRayTracingPipelineCreateInfoKHR* pCreateInfos,
+        const VkAllocationCallbacks* pAllocator,
+        VkPipeline* pPipelines
+    ) {
+        auto& layer = g_devices[device];
+        return layer.CreateRayTracingPipelinesKHR(deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+    }
     VkResult CreateShaderModule(
         const VkShaderModuleCreateInfo* pCreateInfo,
         const VkAllocationCallbacks* pAllocator,
@@ -580,6 +603,18 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Cre
     return water_chika_debug_device_layer::CreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
 }
 
+extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_CreateRayTracingPipelinesKHR(
+    VkDevice device,
+    VkDeferredOperationKHR deferredOperation,
+    VkPipelineCache pipelineCache,
+    uint32_t createInfoCount,
+    const VkRayTracingPipelineCreateInfoKHR* pCreateInfos,
+    const VkAllocationCallbacks* pAllocator,
+    VkPipeline* pPipelines
+) {
+    return water_chika_debug_device_layer::CreateRayTracingPipelinesKHR(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+}
+
 extern "C" __declspec(dllexport)VkResult VKAPI_CALL water_chika_debug_layer_CreateShaderModule(
     VkDevice device,
     const VkShaderModuleCreateInfo * pCreateInfo,
@@ -689,6 +724,7 @@ auto get_device_layer_procs() {
         {"vkFlushMappedMemoryRanges", water_chika_debug_layer_FlushMappedMemoryRanges},
         //{"vkInvalidateMappedMemoryRanges", water_chika_debug_layer_InvalidateMappedMemoryRanges},
         {"vkCreateGraphicsPipelines", water_chika_debug_layer_CreateGraphicsPipelines},
+        {"vkCreateRayTracingPipelinesKHR", water_chika_debug_layer_CreateRayTracingPipelinesKHR},
         {"vkCreateShaderModule", water_chika_debug_layer_CreateShaderModule },
         {"vkGetDeviceQueue", water_chika_debug_layer_GetDeviceQueue},
         {"vkQueuePresentKHR", water_chika_debug_layer_QueuePresentKHR},
