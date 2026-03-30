@@ -67,7 +67,7 @@ public:
             return reinterpret_cast<PFN_vkVoidFunction>(m_dispatch_table[pName]);
         }
         auto procAddr = m_get_next_device_proc_addr(m_device, pName);
-        m_dispatch_table.emplace(pName, procAddr);
+        m_dispatch_table.emplace(std::string{pName}, (void*)procAddr);
         return procAddr;
     }
 
@@ -513,7 +513,7 @@ public:
             return reinterpret_cast<PFN_vkVoidFunction>(m_dispatch_table[pName]);
         }
         auto procAddr = m_get_next_instance_proc_addr(m_instance, pName);
-        m_dispatch_table.emplace(pName, procAddr);
+        m_dispatch_table.emplace(std::string{pName}, (void*)procAddr);
         return procAddr;
     }
 private:
@@ -526,7 +526,7 @@ private:
 };
 
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_CreateInstance(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateInstance(
     const VkInstanceCreateInfo* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
     VkInstance* pInstance
@@ -534,7 +534,7 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Cre
     return water_chika_debug_layer::CreateInstance(pCreateInfo, pAllocator, pInstance);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_CreateDevice(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateDevice(
     const VkPhysicalDevice physical_device,
     const VkDeviceCreateInfo* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
@@ -543,7 +543,7 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Cre
     return water_chika_debug_layer::CreateDevice(physical_device, pCreateInfo, pAllocator, pInstance);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_MapMemory(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_MapMemory(
     VkDevice device,
     VkDeviceMemory memory,
     VkDeviceSize offset,
@@ -555,21 +555,21 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Map
     return water_chika_debug_device_layer::MapMemory(device, memory, offset, size, flags, ppData);
 }
 
-extern "C" __declspec(dllexport) void VKAPI_CALL water_chika_debug_layer_UnmapMemory(
+extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_UnmapMemory(
     VkDevice device,
     VkDeviceMemory memory
 ) {
     return water_chika_debug_device_layer::UnmapMemory(device, memory);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_EnumeratePhysicalDevices(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_EnumeratePhysicalDevices(
     VkInstance instance,
     uint32_t * pPhysicalDeviceCount,
     VkPhysicalDevice * pPhysicalDevices
 ) {
     return water_chika_debug_layer::EnumeratePhysicalDevices(instance, pPhysicalDeviceCount, pPhysicalDevices);
 }
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_FlushMappedMemoryRanges(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_FlushMappedMemoryRanges(
     VkDevice device,
     uint32_t memoryRangeCount,
     const VkMappedMemoryRange * pMemoryRanges
@@ -577,14 +577,14 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Flu
     return water_chika_debug_device_layer::FlushMappedMemoryRanges(device, memoryRangeCount, pMemoryRanges);
 }
 
-extern "C" __declspec(dllexport) void VKAPI_CALL water_chika_debug_layer_GetPhysicalDeviceMemoryProperties(
+extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_GetPhysicalDeviceMemoryProperties(
     VkPhysicalDevice physical_device,
     VkPhysicalDeviceMemoryProperties * pMemoryProperties
 ) {
     return water_chika_debug_layer::GetPhysicalDeviceMemoryProperties(physical_device, pMemoryProperties);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_InvalidateMappedMemoryRanges(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_InvalidateMappedMemoryRanges(
     VkDevice device,
     uint32_t memoryRangeCount,
     const VkMappedMemoryRange * pMemoryRanges
@@ -592,7 +592,7 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Inv
     return water_chika_debug_device_layer::InvalidateMappedMemoryRanges(device, memoryRangeCount, pMemoryRanges);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_CreateGraphicsPipelines(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateGraphicsPipelines(
     VkDevice device,
     VkPipelineCache pipelineCache,
     uint32_t createInfoCount,
@@ -603,7 +603,7 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Cre
     return water_chika_debug_device_layer::CreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_CreateRayTracingPipelinesKHR(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateRayTracingPipelinesKHR(
     VkDevice device,
     VkDeferredOperationKHR deferredOperation,
     VkPipelineCache pipelineCache,
@@ -615,7 +615,7 @@ extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_Cre
     return water_chika_debug_device_layer::CreateRayTracingPipelinesKHR(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
 }
 
-extern "C" __declspec(dllexport)VkResult VKAPI_CALL water_chika_debug_layer_CreateShaderModule(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateShaderModule(
     VkDevice device,
     const VkShaderModuleCreateInfo * pCreateInfo,
     const VkAllocationCallbacks * pAllocator,
@@ -623,13 +623,13 @@ extern "C" __declspec(dllexport)VkResult VKAPI_CALL water_chika_debug_layer_Crea
 ) {
     return water_chika_debug_device_layer::CreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule);
 }
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_QueuePresentKHR(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_QueuePresentKHR(
     VkQueue queue,
     const VkPresentInfoKHR * pPresentInfo
 ) {
     return water_chika_debug_device_layer::QueuePresentKHR(queue, pPresentInfo);
 }
-extern "C" __declspec(dllexport) void VKAPI_CALL water_chika_debug_layer_GetDeviceQueue(
+extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_GetDeviceQueue(
     VkDevice device,
     uint32_t queueFamilyIndex,
     uint32_t queueIndex,
@@ -637,7 +637,7 @@ extern "C" __declspec(dllexport) void VKAPI_CALL water_chika_debug_layer_GetDevi
 ) {
     return water_chika_debug_device_layer::GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
 }
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_AllocateCommandBuffers(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_AllocateCommandBuffers(
     VkDevice device,
     const VkCommandBufferAllocateInfo * pAllocateInfo,
     VkCommandBuffer * pCommandBuffers
@@ -718,41 +718,41 @@ void VKAPI_CALL water_chika_debug_layer_CmdBindVertexBuffers(
 
 auto get_device_layer_procs() {
     std::map<std::string, void*> funcs{
-        {"vkGetDeviceProcAddr", water_chika_debug_layer_GetDeviceProcAddr},
-        {"vkMapMemory", water_chika_debug_layer_MapMemory},
-        {"vkUnmapMemory", water_chika_debug_layer_UnmapMemory},
-        {"vkFlushMappedMemoryRanges", water_chika_debug_layer_FlushMappedMemoryRanges},
-        //{"vkInvalidateMappedMemoryRanges", water_chika_debug_layer_InvalidateMappedMemoryRanges},
-        {"vkCreateGraphicsPipelines", water_chika_debug_layer_CreateGraphicsPipelines},
-        {"vkCreateRayTracingPipelinesKHR", water_chika_debug_layer_CreateRayTracingPipelinesKHR},
-        {"vkCreateShaderModule", water_chika_debug_layer_CreateShaderModule },
-        {"vkGetDeviceQueue", water_chika_debug_layer_GetDeviceQueue},
-        {"vkQueuePresentKHR", water_chika_debug_layer_QueuePresentKHR},
-        {"vkAllocateCommandBuffers", water_chika_debug_layer_AllocateCommandBuffers},
-        {"vkQueueSubmit", water_chika_debug_layer_QueueSubmit},
-        {"vkAllocateMemory", water_chika_debug_layer_AllocateMemory},
-        {"vkFreeMemory", water_chika_debug_layer_FreeMemory},
-        {"vkBindBufferMemory", water_chika_debug_layer_BindBufferMemory},
-        {"vkCmdBindIndexBuffer", water_chika_debug_layer_CmdBindIndexBuffer},
-        {"vkCmdDrawIndexed", water_chika_debug_layer_CmdDrawIndexed},
-        {"vkCmdBindPipeline", water_chika_debug_layer_CmdBindPipeline},
-        {"vkCmdBindVertexBuffers", water_chika_debug_layer_CmdBindVertexBuffers},
+        {"vkGetDeviceProcAddr", (void*)water_chika_debug_layer_GetDeviceProcAddr},
+        {"vkMapMemory", (void*)water_chika_debug_layer_MapMemory},
+        {"vkUnmapMemory", (void*)water_chika_debug_layer_UnmapMemory},
+        {"vkFlushMappedMemoryRanges", (void*)water_chika_debug_layer_FlushMappedMemoryRanges},
+        //{"vkInvalidateMappedMemoryRanges", (void*)water_chika_debug_layer_InvalidateMappedMemoryRanges},
+        {"vkCreateGraphicsPipelines", (void*)water_chika_debug_layer_CreateGraphicsPipelines},
+        {"vkCreateRayTracingPipelinesKHR", (void*)water_chika_debug_layer_CreateRayTracingPipelinesKHR},
+        {"vkCreateShaderModule", (void*)water_chika_debug_layer_CreateShaderModule },
+        {"vkGetDeviceQueue", (void*)water_chika_debug_layer_GetDeviceQueue},
+        {"vkQueuePresentKHR", (void*)water_chika_debug_layer_QueuePresentKHR},
+        {"vkAllocateCommandBuffers", (void*)water_chika_debug_layer_AllocateCommandBuffers},
+        {"vkQueueSubmit", (void*)water_chika_debug_layer_QueueSubmit},
+        {"vkAllocateMemory", (void*)water_chika_debug_layer_AllocateMemory},
+        {"vkFreeMemory", (void*)water_chika_debug_layer_FreeMemory},
+        {"vkBindBufferMemory", (void*)water_chika_debug_layer_BindBufferMemory},
+        {"vkCmdBindIndexBuffer", (void*)water_chika_debug_layer_CmdBindIndexBuffer},
+        {"vkCmdDrawIndexed", (void*)water_chika_debug_layer_CmdDrawIndexed},
+        {"vkCmdBindPipeline", (void*)water_chika_debug_layer_CmdBindPipeline},
+        {"vkCmdBindVertexBuffers", (void*)water_chika_debug_layer_CmdBindVertexBuffers},
     };
     return funcs;
 }
 auto get_instance_layer_procs() {
     std::map<std::string, void*> funcs{
-        {"vkGetInstanceProcAddr", water_chika_debug_layer_GetInstanceProcAddr},
-        {"vkCreateInstance", water_chika_debug_layer_CreateInstance},
-        {"vkEnumeratePhysicalDevices", water_chika_debug_layer_EnumeratePhysicalDevices},
-        {"vkGetDeviceProcAddr", water_chika_debug_layer_GetDeviceProcAddr},
-        {"vkCreateDevice", water_chika_debug_layer_CreateDevice},
-        {"vkGetPhysicalDeviceMemoryProperties", water_chika_debug_layer_GetPhysicalDeviceMemoryProperties},
+        std::pair<std::string,void*>{std::string{"vkGetInstanceProcAddr"}, (void*)water_chika_debug_layer_GetInstanceProcAddr},
+        {"vkCreateInstance", (void*)water_chika_debug_layer_CreateInstance},
+        {"vkEnumeratePhysicalDevices", (void*)water_chika_debug_layer_EnumeratePhysicalDevices},
+        {"vkGetDeviceProcAddr", (void*)water_chika_debug_layer_GetDeviceProcAddr},
+        {"vkCreateDevice", (void*)water_chika_debug_layer_CreateDevice},
+        {"vkGetPhysicalDeviceMemoryProperties", (void*)water_chika_debug_layer_GetPhysicalDeviceMemoryProperties},
     };
     return funcs;
 }
 
-extern "C" __declspec(dllexport) PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetDeviceProcAddr(
+extern "C" DLLEXPORT PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetDeviceProcAddr(
     VkDevice device, const char* pName
 ) {
     auto funcs = get_device_layer_procs();
@@ -764,7 +764,7 @@ extern "C" __declspec(dllexport) PFN_vkVoidFunction VKAPI_CALL water_chika_debug
 
 
 
-extern "C" __declspec(dllexport) PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetInstanceProcAddr(
+extern "C" DLLEXPORT PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetInstanceProcAddr(
     VkInstance instance, const char* pName
 ) {
     auto funcs = get_instance_layer_procs();
@@ -774,7 +774,7 @@ extern "C" __declspec(dllexport) PFN_vkVoidFunction VKAPI_CALL water_chika_debug
     return water_chika_debug_layer::GetInstanceProcAddr(instance, pName);
 }
 
-extern "C" __declspec(dllexport) VkResult VKAPI_CALL water_chika_debug_layer_NegotiateLoaderLayerInterfaceVersion(
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_NegotiateLoaderLayerInterfaceVersion(
     VkNegotiateLayerInterface* pVersionStruct
 ){
     pVersionStruct->loaderLayerInterfaceVersion;

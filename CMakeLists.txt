@@ -11,7 +11,7 @@ add_library(vk_water_chika_debug_layer SHARED
 
 target_include_directories(vk_water_chika_debug_layer PUBLIC ${Vulkan_INCLUDE_DIRS})
 
-set_target_properties(vk_water_chika_debug_layer PROPERTIES CXX_STANDARD 23)
+target_compile_features(vk_water_chika_debug_layer PUBLIC cxx_std_23)
 
 add_executable(vk_layer_generator
     vk_layer_generator.cpp
@@ -19,4 +19,4 @@ add_executable(vk_layer_generator
 )
 
 target_include_directories(vk_layer_generator PUBLIC ${Vulkan_INCLUDE_DIRS})
-set_target_properties(vk_layer_generator PROPERTIES CXX_STANDARD 23)
+target_compile_features(vk_layer_generator PUBLIC cxx_std_23)
