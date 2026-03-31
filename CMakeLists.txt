@@ -11,6 +11,10 @@ add_library(vk_water_chika_debug_layer SHARED
 
 target_include_directories(vk_water_chika_debug_layer PUBLIC ${Vulkan_INCLUDE_DIRS})
 
+target_link_libraries(vk_water_chika_debug_layer PUBLIC
+    spirv_parser
+)
+
 target_compile_features(vk_water_chika_debug_layer PUBLIC cxx_std_23)
 
 add_executable(vk_layer_generator
