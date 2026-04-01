@@ -11,6 +11,8 @@
 #include <cassert>
 #include <mutex>
 
+#include <spirv_parser.hpp>
+
 struct type_next {
     VkStructureType sType;
     type_next* pNext;
@@ -187,6 +189,36 @@ public:
     ) {
         auto nextCreateShaderModule = reinterpret_cast<PFN_vkCreateShaderModule>(get_next_device_proc_addr("vkCreateShaderModule"));
         auto res = nextCreateShaderModule(m_device, pCreateInfo, pAllocator, pShaderModule);
+        if (VK_SUCCESS == res) {
+            using namespace spirv_parser;
+            auto& out = std::cout;
+            auto spirv_code = std::span{const_cast<word*>(pCreateInfo->pCode), pCreateInfo->codeSize/sizeof(word)};
+
+            auto m = spirv_parser::module_binary{ spirv_code };
+            if (m.get_magic_number() != spv::MagicNumber) {
+                throw std::runtime_error{ std::format("file magic number is {} != {}", m.get_magic_number(), spv::MagicNumber) };
+            }
+            for (auto inst : m) {
+                const auto encode = get_instruction_encode(inst.get_opcode());
+                if (encode.op != inst.get_opcode()) {
+                    throw std::runtime_error{std::format("unknow opcode {}",spv::OpToString(inst.get_opcode()))};
+                }
+                if (encode.op != spv::OpCapability) {
+                    continue;
+                }
+                out << inst.get_opcode();
+                auto word = inst.words+1;
+                for (const auto& arg : encode.args) {
+                    if (arg == instruction_argument::none || word >= inst.words + inst.get_word_count()) {
+                        break;
+                    }
+                    auto arg_binary_ref = instruction_argument_binary_ref{arg, word, inst.words + inst.get_word_count()};
+                    out << " " << arg_binary_ref;
+                    word += get_word_count(arg_binary_ref);
+                }
+            }
+            out << std::endl;
+        }
         return res;
     }
     static VkResult CreateShaderModule(
@@ -931,17 +963,21 @@ auto get_device_layer_procs() {
         {"vkUnmapMemory", (void*)water_chika_debug_layer_UnmapMemory},
         {"vkFlushMappedMemoryRanges", (void*)water_chika_debug_layer_FlushMappedMemoryRanges},
         //{"vkInvalidateMappedMemoryRanges", (void*)water_chika_debug_layer_InvalidateMappedMemoryRanges},
+
         {"vkCreateGraphicsPipelines", (void*)water_chika_debug_layer_CreateGraphicsPipelines},
         {"vkCreateRayTracingPipelinesKHR", (void*)water_chika_debug_layer_CreateRayTracingPipelinesKHR},
         {"vkCreateShaderModule", (void*)water_chika_debug_layer_CreateShaderModule },
+
         {"vkGetDeviceQueue", (void*)water_chika_debug_layer_GetDeviceQueue},
         {"vkQueuePresentKHR", (void*)water_chika_debug_layer_QueuePresentKHR},
+
         {"vkCreateCommandPool", (void*)water_chika_debug_layer_CreateCommandPool},
         {"vkResetCommandPool", (void*)water_chika_debug_layer_ResetCommandPool},
         {"vkDestroyCommandPool", (void*)water_chika_debug_layer_DestroyCommandPool},
         {"vkAllocateCommandBuffers", (void*)water_chika_debug_layer_AllocateCommandBuffers},
         {"vkResetCommandBuffer", (void*)water_chika_debug_layer_ResetCommandBuffer},
         {"vkFreeCommandBuffers", (void*)water_chika_debug_layer_FreeCommandBuffers},
+
         {"vkQueueSubmit", (void*)water_chika_debug_layer_QueueSubmit},
         {"vkAllocateMemory", (void*)water_chika_debug_layer_AllocateMemory},
         {"vkFreeMemory", (void*)water_chika_debug_layer_FreeMemory},
