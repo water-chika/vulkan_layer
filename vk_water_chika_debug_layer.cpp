@@ -189,9 +189,10 @@ public:
     ) {
         auto nextCreateShaderModule = reinterpret_cast<PFN_vkCreateShaderModule>(get_next_device_proc_addr("vkCreateShaderModule"));
         auto res = nextCreateShaderModule(m_device, pCreateInfo, pAllocator, pShaderModule);
+        try{
         if (VK_SUCCESS == res) {
             using namespace spirv_parser;
-            auto& out = std::cout;
+            auto& out = std::cerr;
             auto spirv_code = std::span{const_cast<word*>(pCreateInfo->pCode), pCreateInfo->codeSize/sizeof(word)};
 
             auto m = spirv_parser::module_binary{ spirv_code };
@@ -216,8 +217,12 @@ public:
                     out << " " << arg_binary_ref;
                     word += get_word_count(arg_binary_ref);
                 }
+                out << std::endl;
             }
-            out << std::endl;
+        }
+        }
+        catch (std::exception& e) {
+            std::cerr << e.what() << std::endl;
         }
         return res;
     }
