@@ -137,15 +137,24 @@ public:
         auto& layer = g_devices[device];
         return layer.InvalidateMappedMemoryRanges(memoryRangeCount, pMemoryRanges);
     }
-    VkResult CreateGraphicsPipelines(
-        VkPipelineCache pipelineCache,
-        uint32_t createInfoCount,
-        const VkGraphicsPipelineCreateInfo* pCreateInfos,
-        const VkAllocationCallbacks* pAllocator,
-        VkPipeline* pPipeline
+    VkResult create_graphics_pipelines(
+        VkPipelineCache pipeline_cache,
+        uint32_t create_info_count,
+        const VkGraphicsPipelineCreateInfo* create_infos,
+        const VkAllocationCallbacks* allocator,
+        VkPipeline* pipelines
     ) {
         auto nextCreateGraphicsPipelines = reinterpret_cast<PFN_vkCreateGraphicsPipelines>(get_next_device_proc_addr("vkCreateGraphicsPipelines"));
-        return nextCreateGraphicsPipelines(m_device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
+        auto res = nextCreateGraphicsPipelines(m_device, pipeline_cache, create_info_count, create_infos, allocator, pipelines);
+        if (VK_SUCCESS == res) {
+            for (uint32_t i = 0; i < create_info_count; ++i) {
+                pipeline_infos.emplace(
+                        pipelines[i],
+                        pipeline_info{
+                        });
+            }
+        }
+        return res;
     }
     static VkResult CreateGraphicsPipelines(
         VkDevice device,
@@ -157,18 +166,27 @@ public:
     ) {
         auto& layer = g_devices[device];
 
-        return layer.CreateGraphicsPipelines(pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
+        return layer.create_graphics_pipelines(pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipeline);
     }
-    VkResult CreateRayTracingPipelinesKHR(
-        VkDeferredOperationKHR deferredOperation,
-        VkPipelineCache pipelineCache,
-        uint32_t createInfoCount,
-        const VkRayTracingPipelineCreateInfoKHR* pCreateInfos,
-        const VkAllocationCallbacks* pAllocator,
-        VkPipeline* pPipelines
+    VkResult create_ray_tracing_pipelines_khr(
+        VkDeferredOperationKHR deferred_operation,
+        VkPipelineCache pipeline_cache,
+        uint32_t create_info_count,
+        const VkRayTracingPipelineCreateInfoKHR* create_infos,
+        const VkAllocationCallbacks* allocator,
+        VkPipeline* pipelines
     ) {
         auto nextCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(get_next_device_proc_addr("vkCreateRayTracingPipelinesKHR"));
-        return nextCreateRayTracingPipelinesKHR(m_device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+        auto res = nextCreateRayTracingPipelinesKHR(m_device, deferred_operation, pipeline_cache, create_info_count, create_infos, allocator, pipelines);
+        if (VK_SUCCESS == res) {
+            for (uint32_t i = 0; i < create_info_count; ++i) {
+                pipeline_infos.emplace(
+                        pipelines[i],
+                        pipeline_info{
+                        });
+            }
+        }
+        return res;
     }
     static VkResult CreateRayTracingPipelinesKHR(
         VkDevice device,
@@ -180,15 +198,70 @@ public:
         VkPipeline* pPipelines
     ) {
         auto& layer = g_devices[device];
-        return layer.CreateRayTracingPipelinesKHR(deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+        return layer.create_ray_tracing_pipelines_khr(deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
     }
-    VkResult CreateShaderModule(
+    VkResult create_compute_pipelines(
+        VkDevice device,
+        VkPipelineCache pipeline_cache,
+        uint32_t create_info_count,
+        const VkComputePipelineCreateInfo* create_infos,
+        const VkAllocationCallbacks* allocator,
+        VkPipeline* pipelines
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkCreateComputePipelines>(get_next_device_proc_addr("vkCreateComputePipelines"));
+        auto res = next_call(device, pipeline_cache, create_info_count, create_infos, allocator, pipelines);
+        if (VK_SUCCESS == res) {
+            for (uint32_t i = 0; i < create_info_count; ++i) {
+                auto shader_module = create_infos[i].stage.module;
+                auto shader_module_info = shader_module_infos[shader_module];
+                pipeline_infos.emplace(
+                        pipelines[i],
+                        pipeline_info{
+                            .hasCooperativeMatrixKHR = shader_module_info.hasCooperativeMatrixKHR,
+                            .hasDotProductInput4x8BitPackedKHR = shader_module_info.hasDotProductInput4x8BitPackedKHR,
+                        });
+            }
+        }
+        return res;
+    }
+    static VkResult CreateComputePipelines(
+        VkDevice device,
+        VkPipelineCache pipelineCache,
+        uint32_t createInfoCount,
+        const VkComputePipelineCreateInfo* pCreateInfos,
+        const VkAllocationCallbacks* pAllocator,
+        VkPipeline* pPipelines
+    ) {
+        auto& layer = g_devices[device];
+        return layer.create_compute_pipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+    }
+    void destroy_pipeline(
+        VkDevice device,
+        VkPipeline pipeline,
+        const VkAllocationCallbacks* allocator
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkDestroyPipeline>(get_next_device_proc_addr("vkDestroyPipeline"));
+        next_call(device, pipeline, allocator);
+        pipeline_infos.erase(pipeline);
+    }
+    static void DestroyPipeline(
+        VkDevice device,
+        VkPipeline pipeline,
+        const VkAllocationCallbacks* pAllocator
+    ) {
+        auto& layer = g_devices[device];
+        layer.destroy_pipeline(device, pipeline, pAllocator);
+    }
+    VkResult create_shader_module(
         const VkShaderModuleCreateInfo* pCreateInfo,
         const VkAllocationCallbacks* pAllocator,
         VkShaderModule* pShaderModule
     ) {
         auto nextCreateShaderModule = reinterpret_cast<PFN_vkCreateShaderModule>(get_next_device_proc_addr("vkCreateShaderModule"));
         auto res = nextCreateShaderModule(m_device, pCreateInfo, pAllocator, pShaderModule);
+
+        bool hasCooperativeMatrixKHR = false;
+        bool hasDotProductInput4x8BitPackedKHR = false;
         try{
         if (VK_SUCCESS == res) {
             using namespace spirv_parser;
@@ -214,6 +287,12 @@ public:
                         break;
                     }
                     auto arg_binary_ref = instruction_argument_binary_ref{arg, word, inst.words + inst.get_word_count()};
+                    if (*arg_binary_ref.argument_word == spv::CapabilityCooperativeMatrixKHR) {
+                        hasCooperativeMatrixKHR = true;
+                    }
+                    if (*arg_binary_ref.argument_word == spv::CapabilityDotProductInput4x8BitPackedKHR) {
+                        hasDotProductInput4x8BitPackedKHR = true;
+                    }
                     out << " " << arg_binary_ref;
                     word += get_word_count(arg_binary_ref);
                 }
@@ -224,6 +303,16 @@ public:
         catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
         }
+
+        if (VK_SUCCESS == res) {
+            shader_module_infos.emplace(
+                    *pShaderModule,
+                    shader_module_info{
+                        .hasCooperativeMatrixKHR = hasCooperativeMatrixKHR,
+                        .hasDotProductInput4x8BitPackedKHR = hasDotProductInput4x8BitPackedKHR
+                    });
+        }
+
         return res;
     }
     static VkResult CreateShaderModule(
@@ -233,8 +322,25 @@ public:
         VkShaderModule* pShaderModule
     ) {
         auto& layer = g_devices[device];
-        auto res = layer.CreateShaderModule(pCreateInfo, pAllocator, pShaderModule);
+        auto res = layer.create_shader_module(pCreateInfo, pAllocator, pShaderModule);
         return res;
+    }
+    void destroy_shader_module(
+        VkDevice device,
+        VkShaderModule shader_module,
+        const VkAllocationCallbacks* allocator
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkDestroyShaderModule>(get_next_device_proc_addr("vkDestroyShaderModule"));
+        next_call(device, shader_module, allocator);
+        shader_module_infos.erase(shader_module);
+    }
+    static void DestroyShaderModule(
+        VkDevice device,
+        VkShaderModule shaderModule,
+        const VkAllocationCallbacks* pAllocator
+    ) {
+        auto& layer = g_devices[device];
+        layer.destroy_shader_module(device, shaderModule, pAllocator);
     }
     void GetDeviceQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue) {
         auto nextGetDeviceQueue = reinterpret_cast<PFN_vkGetDeviceQueue>(get_next_device_proc_addr("vkGetDeviceQueue"));
@@ -511,7 +617,10 @@ public:
         std::cerr << "command bind pipeline:" << std::endl;
         std::cerr << "bound pipelines:" << std::endl;
         for (auto& [point, pipeline] : pipelines) {
-            std::cerr << point << " " << pipeline << std::endl;
+            auto pipeline_info = pipeline_infos[pipeline];
+            std::cerr << point << " " << pipeline << ": ";
+            std::cerr << pipeline_info.hasCooperativeMatrixKHR << ",";
+            std::cerr << pipeline_info.hasDotProductInput4x8BitPackedKHR<< std::endl;
         }
 
         nextBindPipeline(command_buffer, pipeline_bind_point, pipeline);
@@ -606,6 +715,17 @@ private:
         std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> pipelines;
     };
     inline static std::unordered_map<VkCommandBuffer, command_buffer> g_command_buffers;
+
+    struct shader_module_info {
+        bool hasCooperativeMatrixKHR;
+        bool hasDotProductInput4x8BitPackedKHR;
+    };
+    std::unordered_map<VkShaderModule, shader_module_info> shader_module_infos;
+    struct pipeline_info {
+        bool hasCooperativeMatrixKHR;
+        bool hasDotProductInput4x8BitPackedKHR;
+    };
+    std::unordered_map<VkPipeline, pipeline_info> pipeline_infos;
 
     water_chika_debug_layer* m_instance_layer;
     VkPhysicalDevice m_physical_device;
@@ -823,7 +943,23 @@ extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateRayTracin
 ) {
     return water_chika_debug_device_layer::CreateRayTracingPipelinesKHR(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
 }
-
+extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateComputePipelines(
+    VkDevice device,
+    VkPipelineCache pipelineCache,
+    uint32_t createInfoCount,
+    const VkComputePipelineCreateInfo* pCreateInfos,
+    const VkAllocationCallbacks* pAllocator,
+    VkPipeline* pPipelines
+) {
+    return water_chika_debug_device_layer::CreateComputePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+}
+extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_DestroyPipeline(
+    VkDevice device,
+    VkPipeline pipeline,
+    const VkAllocationCallbacks* pAllocator
+) {
+    water_chika_debug_device_layer::DestroyPipeline(device, pipeline, pAllocator);
+}
 extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateShaderModule(
     VkDevice device,
     const VkShaderModuleCreateInfo * pCreateInfo,
@@ -832,6 +968,14 @@ extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_CreateShaderMod
 ) {
     return water_chika_debug_device_layer::CreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule);
 }
+extern "C" DLLEXPORT void water_chika_debug_layer_DestroyShaderModule(
+    VkDevice device,
+    VkShaderModule shaderModule,
+    const VkAllocationCallbacks* pAllocator
+) {
+    return water_chika_debug_device_layer::DestroyShaderModule(device, shaderModule, pAllocator);
+}
+
 extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_QueuePresentKHR(
     VkQueue queue,
     const VkPresentInfoKHR * pPresentInfo
@@ -971,7 +1115,11 @@ auto get_device_layer_procs() {
 
         {"vkCreateGraphicsPipelines", (void*)water_chika_debug_layer_CreateGraphicsPipelines},
         {"vkCreateRayTracingPipelinesKHR", (void*)water_chika_debug_layer_CreateRayTracingPipelinesKHR},
+        {"vkCreateComputePipelines", (void*)water_chika_debug_layer_CreateComputePipelines},
+        {"vkDestroyPipeline", (void*)water_chika_debug_layer_DestroyPipeline},
+
         {"vkCreateShaderModule", (void*)water_chika_debug_layer_CreateShaderModule },
+        {"vkDestroyShaderModule", (void*)water_chika_debug_layer_DestroyShaderModule},
 
         {"vkGetDeviceQueue", (void*)water_chika_debug_layer_GetDeviceQueue},
         {"vkQueuePresentKHR", (void*)water_chika_debug_layer_QueuePresentKHR},
