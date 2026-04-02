@@ -450,11 +450,13 @@ public:
         VkCommandBufferResetFlags flags
     ) {
         auto next_call = reinterpret_cast<PFN_vkResetCommandBuffer>(get_next_device_proc_addr("vkResetCommandBuffer"));
-        auto res = next_call(command_buffer, flags);
-        if (VK_SUCCESS == res) {
-            reset(command_buffer);
+        auto& info = g_command_buffers[command_buffer];
+        for (auto& c : info.command_buffers) {
+            auto res = next_call(c, flags);
+            assert(VK_SUCCESS == res);
         }
-        return res;
+        reset(command_buffer);
+        return VK_SUCCESS;
     }
     static VkResult ResetCommandBuffer(
         VkCommandBuffer commandBuffer,
@@ -550,21 +552,16 @@ public:
                 }
             }
             {
-            auto cmd_submit_info = VkSubmitInfo{
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                .pNext = submit.pNext,
-                .signalSemaphoreCount = submit.signalSemaphoreCount,
-                .pSignalSemaphores = submit.pSignalSemaphores
-            };
-            nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                auto cmd_submit_info = VkSubmitInfo{
+                    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                    .pNext = submit.pNext,
+                    .signalSemaphoreCount = submit.signalSemaphoreCount,
+                    .pSignalSemaphores = submit.pSignalSemaphores
+                };
+                nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
             }
         }
-        {
-        auto cmd_submit_info = VkSubmitInfo{
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        };
         nextQueueSubmit(queue, 0, nullptr, fence);
-        }
         return VK_SUCCESS;
     }
     static VkResult QueueSubmit(
@@ -663,13 +660,10 @@ public:
             //std::cerr << pipeline_info.hasDotProductInput4x8BitPackedKHR<< std::endl;
         }
 
+        VkCommandBuffer cmd_buf = command_buffer;
         auto& info = g_command_buffers[command_buffer];
 
-        if (info.command_buffers.empty()) {
-            info.command_buffers.emplace_back(command_buffer);
-        }
-        else {
-            VkCommandBuffer cmd_buf = VK_NULL_HANDLE;
+        if (false) {
             if (info.unused_command_buffers.empty()) {
                 auto nextAllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(get_next_device_proc_addr("vkAllocateCommandBuffers"));
                 VkCommandBufferAllocateInfo create_info{
@@ -706,9 +700,9 @@ public:
                         sets.descriptor_sets.size(), sets.descriptor_sets.data(),
                         sets.dynamic_offsets.size(), sets.dynamic_offsets.data());
             }
-        }
 
-        auto cmd_buf = current_command_buffer(command_buffer);
+            cmd_buf = current_command_buffer(command_buffer);
+        }
 
         nextBindPipeline(cmd_buf, pipeline_bind_point, pipeline);
     }
@@ -751,7 +745,8 @@ public:
     ) {
         auto next_call = reinterpret_cast<PFN_vkCmdPushConstants>(get_next_device_proc_addr("vkCmdPushConstants"));
 
-        auto cmd_buf = current_command_buffer(command_buffer);
+        auto cmd_buf = command_buffer;
+        cmd_buf = current_command_buffer(command_buffer);
         next_call(cmd_buf, layout, stageFlags, offset, size, values);
 
         auto& info = g_command_buffers[command_buffer];
@@ -783,7 +778,8 @@ public:
     ) {
         auto next_call = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(get_next_device_proc_addr("vkCmdBindDescriptorSets"));
 
-        auto cmd_buf = current_command_buffer(command_buffer);
+        auto cmd_buf = command_buffer;
+        cmd_buf = current_command_buffer(command_buffer);
         next_call(cmd_buf, pipeline_bind_point, layout, first_set, descriptor_set_count, descriptor_sets,
                 dynamic_offset_count, dynamic_offsets);
 
@@ -818,7 +814,8 @@ public:
     ) {
         auto next_call = reinterpret_cast<PFN_vkCmdDispatch>(get_next_device_proc_addr("vkCmdDispatch"));
 
-        auto cmd_buf = current_command_buffer(command_buffer);
+        auto cmd_buf = command_buffer;
+        cmd_buf = current_command_buffer(command_buffer);
         next_call(cmd_buf, group_count_x, group_count_y, group_count_z);
     }
     static void CmdDispatch(
@@ -851,7 +848,8 @@ public:
         VkCommandBuffer command_buffer
     ) {
         auto next_call = reinterpret_cast<PFN_vkEndCommandBuffer>(get_next_device_proc_addr("vkEndCommandBuffer"));
-        auto cmd_buf = current_command_buffer(command_buffer);
+        auto cmd_buf = command_buffer;
+        cmd_buf = current_command_buffer(command_buffer);
         auto& info = g_command_buffers[command_buffer];
         for (auto cmd_buf : info.command_buffers) {
             next_call(cmd_buf);
@@ -890,6 +888,7 @@ protected:
             VkCommandBuffer cmd,
             VkDevice device, VkCommandPool command_pool) {
         g_command_buffers.emplace(cmd, command_buffer{device, command_pool, {cmd}, {}, {}});
+        assert(!g_command_buffers[cmd].command_buffers.empty());
     }
     inline static std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> get_command_buffer_pipelines(VkCommandBuffer cmd) {
         return g_command_buffers[cmd].pipelines;
@@ -898,33 +897,27 @@ protected:
         g_command_buffers[cmd].pipelines.emplace_back(bind_point, pipeline);
     }
     inline static VkDevice command_buffer_to_device(VkCommandBuffer cmd) {
-        if (g_command_buffers.contains(cmd)) {
-            return g_command_buffers[cmd].device;
-        }
-        else {
-            return VK_NULL_HANDLE;
-        }
+        assert(g_command_buffers.contains(cmd));
+        return g_command_buffers[cmd].device;
     }
     inline static void reset(VkCommandBuffer command_buffer) {
-        auto& cmd = g_command_buffers[command_buffer];
-        cmd.pipelines.clear();
-        for (auto c : cmd.command_buffers) {
-            cmd.unused_command_buffers.emplace_back(c);
+        auto& info = g_command_buffers[command_buffer];
+        info.pipelines.clear();
+        for (auto iter = info.command_buffers.begin()+1; iter < info.command_buffers.end(); ++iter) {
+            info.unused_command_buffers.emplace_back(*iter);
         }
-        cmd.command_buffers.clear();
+        info.command_buffers.resize(1);
     }
     inline static void free_command_buffer(VkCommandBuffer command_buffer) {
         reset(command_buffer);
     }
-    inline void destroy(VkCommandBuffer command_buffer) {
-        g_command_buffers.erase(command_buffer);
-    }
     inline VkCommandBuffer current_command_buffer(VkCommandBuffer cmd) {
-        return *(g_command_buffers[cmd].command_buffers.end()-1);
+        assert(g_command_buffers.contains(cmd));
+        return g_command_buffers[cmd].command_buffers.back();
     }
 private:
-    inline static std::map<VkDevice, water_chika_debug_device_layer> g_devices;
-    inline static std::map<VkQueue, VkDevice> g_queues;
+    inline static std::unordered_map<VkDevice, water_chika_debug_device_layer> g_devices;
+    inline static std::unordered_map<VkQueue, VkDevice> g_queues;
     struct command_pool_info {
         std::set<VkCommandBuffer> command_buffers;
     };
