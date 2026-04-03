@@ -862,18 +862,23 @@ public:
         auto& layer = g_devices[device];
         return layer.begin_command_buffer(commandBuffer, pBeginInfo);
     }
-    void end_command_buffer(
+    VkResult end_command_buffer(
         VkCommandBuffer command_buffer
     ) {
         auto next_call = reinterpret_cast<PFN_vkEndCommandBuffer>(get_next_device_proc_addr("vkEndCommandBuffer"));
         auto cmd_buf = command_buffer;
         cmd_buf = current_command_buffer(command_buffer);
         auto& info = g_command_buffers[command_buffer];
+        auto res = VK_SUCCESS;
         for (auto cmd_buf : info.command_buffers) {
-            next_call(cmd_buf);
+            auto res_i = next_call(cmd_buf);
+            if (VK_SUCCESS != res_i) {
+                res = res_i;
+            }
         }
+        return res;
     }
-    static void EndCommandBuffer(
+    static VkResult EndCommandBuffer(
         VkCommandBuffer commandBuffer
     ) {
         auto device = command_buffer_to_device(commandBuffer);
@@ -1400,7 +1405,7 @@ VkResult VKAPI_CALL water_chika_debug_layer_BeginCommandBuffer(
 ) {
     return water_chika_debug_device_layer::BeginCommandBuffer(commandBuffer, pBeginInfo);
 }
-void VKAPI_CALL water_chika_debug_layer_EndCommandBuffer(
+VkResult VKAPI_CALL water_chika_debug_layer_EndCommandBuffer(
     VkCommandBuffer commandBuffer
 ) {
     return water_chika_debug_device_layer::EndCommandBuffer(commandBuffer);
