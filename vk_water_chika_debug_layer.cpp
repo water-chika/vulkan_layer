@@ -431,7 +431,7 @@ public:
         if (res == VK_SUCCESS) {
             for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; i++) {
                 add_command_buffer(pCommandBuffers[i], m_device, pAllocateInfo->commandPool);
-                std::cerr << "allocate command buffer: " << pCommandBuffers[i] << std::endl;
+                //std::cerr << "allocate command buffer: " << pCommandBuffers[i] << std::endl;
                 add_command_buffer(pAllocateInfo->commandPool, pCommandBuffers[i]);
             }
         }
