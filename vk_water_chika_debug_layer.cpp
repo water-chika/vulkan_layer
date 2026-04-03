@@ -527,41 +527,59 @@ public:
         VkFence fence
     ) {
         auto nextQueueSubmit = reinterpret_cast<PFN_vkQueueSubmit>(get_next_device_proc_addr("vkQueueSubmit"));
-
+        auto nextQueueWaitIdle = reinterpret_cast<PFN_vkQueueWaitIdle>(get_next_device_proc_addr("vkQueueWaitIdle"));
+        bool every_command_not_split = true;
         for (auto& submit : std::span{pSubmits, submit_count}) {
-            auto cmd_submit_info = VkSubmitInfo{
-                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                .pNext = submit.pNext,
-                .waitSemaphoreCount = submit.waitSemaphoreCount,
-                .pWaitSemaphores = submit.pWaitSemaphores,
-                .pWaitDstStageMask = submit.pWaitDstStageMask,
-            };
-            nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
             for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
                 auto& info = g_command_buffers[cmd_buf];
-                for (auto inner_cmd : info.command_buffers) {
-                    auto cmd_submit_info = VkSubmitInfo{
-                        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                        .commandBufferCount = 1,
-                        .pCommandBuffers = &inner_cmd,
-                    };
-                    auto res = nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
-                    if (VK_SUCCESS != res) {
-                        return res;
-                    }
+                if (info.command_buffers.size() != 1) {
+                    every_command_not_split = false;
                 }
             }
-            {
+        }
+
+        if (false && every_command_not_split) {
+            return nextQueueSubmit(queue, submit_count, pSubmits, fence);
+        }
+        else {
+            for (auto& submit : std::span{pSubmits, submit_count}) {
                 auto cmd_submit_info = VkSubmitInfo{
                     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                     .pNext = submit.pNext,
-                    .signalSemaphoreCount = submit.signalSemaphoreCount,
-                    .pSignalSemaphores = submit.pSignalSemaphores
+                    .waitSemaphoreCount = submit.waitSemaphoreCount,
+                    .pWaitSemaphores = submit.pWaitSemaphores,
+                    .pWaitDstStageMask = submit.pWaitDstStageMask,
                 };
                 nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
+                    auto& info = g_command_buffers[cmd_buf];
+                    for (auto inner_cmd : info.command_buffers) {
+                        auto cmd_submit_info = VkSubmitInfo{
+                            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                            .commandBufferCount = 1,
+                            .pCommandBuffers = &inner_cmd,
+                        };
+                        nextQueueWaitIdle(queue);
+                        auto res = nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                        if (VK_SUCCESS != res) {
+                            return res;
+                        }
+                    }
+                }
+                {
+                    auto cmd_submit_info = VkSubmitInfo{
+                        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                        .pNext = submit.pNext,
+                        .signalSemaphoreCount = submit.signalSemaphoreCount,
+                        .pSignalSemaphores = submit.pSignalSemaphores
+                    };
+                    nextQueueWaitIdle(queue);
+                    nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                }
             }
+            nextQueueWaitIdle(queue);
+            nextQueueSubmit(queue, 0, nullptr, fence);
         }
-        nextQueueSubmit(queue, 0, nullptr, fence);
         return VK_SUCCESS;
     }
     static VkResult QueueSubmit(
@@ -663,7 +681,7 @@ public:
         VkCommandBuffer cmd_buf = command_buffer;
         auto& info = g_command_buffers[command_buffer];
 
-        if (false) {
+        if (true) {
             if (info.unused_command_buffers.empty()) {
                 auto nextAllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(get_next_device_proc_addr("vkAllocateCommandBuffers"));
                 VkCommandBufferAllocateInfo create_info{
