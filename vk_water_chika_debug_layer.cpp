@@ -13,6 +13,9 @@
 
 #include <spirv_parser.hpp>
 
+#include <vulkan/vulkan_beta.h>
+#include <vk_cmd_buf_split_info.hpp>
+
 struct type_next {
     VkStructureType sType;
     type_next* pNext;

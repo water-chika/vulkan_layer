@@ -1,7 +1,8 @@
 import xml.etree.ElementTree as ET
 import sys
+import argparse
 
-def generate(file):
+def generate(file, output):
     tree = ET.parse(file)
     root = tree.getroot()
     for command in root.findall('commands/command'):
@@ -9,33 +10,36 @@ def generate(file):
         name = command.find('proto/name')
         params = command.findall('param')
         if (name != None and ret_type != None and params != None and 'cmdbufferlevel' in command.attrib):
-            print(ret_type.text, name.text, "(", end="")
+            print(ret_type.text, name.text, "(", end="", file=output)
             first_param = True;
             for param in params:
                 if not first_param:
-                    print(",")
+                    print(",", file=output)
                 else:
-                    print("")
+                    print("", file=output)
                     first_param = False
-                param_type = param.find('type').text
-                param_name = param.find('name').text
-                print("    ", param_type, param_name, end="")
-            print(") {")
-            print("    could_split = false;")
-            print("}")
+                print("    ", "".join(param.itertext()).replace("VkRefreshObjectListKHR", "void"), end="", file=output)
+            print(") {", file=output)
+            print("    could_split = false;", file=output)
+            print("}", file=output)
 
-def generate_cmd_buf(file):
-    print("#pragma once")
-    print("namespace water_chika {")
-    print("class cmd_buf_split_info {")
-    print("public:")
-    print("cmd_buf_info_split_info(bool could_split) : could_split{could_split}{}")
-    generate(file)
-    print("protected:")
-    print("bool could_split;")
-    print("}//class cmd_buf_info")
-    print("}//namespace water_chika")
+def generate_cmd_buf(file, output):
+    print("#pragma once", file=output)
+    print("namespace water_chika {", file=output)
+    print("class cmd_buf_split_info {", file=output)
+    print("public:", file=output)
+    print("cmd_buf_split_info(bool could_split) : could_split{could_split}{}", file=output)
+    generate(file, output)
+    print("protected:", file=output)
+    print("bool could_split;", file=output)
+    print("};//class cmd_buf_info", file=output)
+    print("}//namespace water_chika", file=output)
 
 if __name__ == '__main__':
-    file = sys.argv[1]
-    generate_cmd_buf(file)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('registry_xml', type=str)
+    parser.add_argument('--output', type=str)
+    args = parser.parse_args()
+    file = args.registry_xml
+    with open(args.output, 'w') as output:
+        generate_cmd_buf(file, output)
