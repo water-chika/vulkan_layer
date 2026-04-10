@@ -24,6 +24,18 @@ def generate(file):
             print("    could_split = false;")
             print("}")
 
+def generate_cmd_buf(file):
+    print("#pragma once")
+    print("namespace water_chika {")
+    print("class cmd_buf_split_info {")
+    print("public:")
+    print("cmd_buf_info_split_info(bool could_split) : could_split{could_split}{}")
+    generate(file)
+    print("protected:")
+    print("bool could_split;")
+    print("}//class cmd_buf_info")
+    print("}//namespace water_chika")
+
 if __name__ == '__main__':
     file = sys.argv[1]
-    generate(file)
+    generate_cmd_buf(file)
