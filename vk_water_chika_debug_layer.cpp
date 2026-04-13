@@ -46,8 +46,14 @@ public:
         water_chika_debug_layer* instance_layer,
         VkPhysicalDevice physical_device,
         VkDevice device,
-        PFN_vkGetDeviceProcAddr get_device_proc_addr) {
-        water_chika_debug_device_layer device_layer{ instance_layer, physical_device, device, get_device_proc_addr };
+        PFN_vkGetDeviceProcAddr get_device_proc_addr,
+        PFN_vkSetDeviceLoaderData set_device_loader_data
+        ) {
+        water_chika_debug_device_layer device_layer{
+            instance_layer, physical_device, device,
+            get_device_proc_addr,
+            set_device_loader_data
+        };
         g_devices.emplace(device, std::move(device_layer));
     }
     water_chika_debug_device_layer() = default;
@@ -57,9 +63,13 @@ public:
     water_chika_debug_device_layer& operator=(water_chika_debug_device_layer&&) = default;
     water_chika_debug_device_layer(
         water_chika_debug_layer* instance_layer, const VkPhysicalDevice physical_device, VkDevice device,
-        PFN_vkGetDeviceProcAddr get_device_proc_addr)
+        PFN_vkGetDeviceProcAddr get_device_proc_addr,
+        PFN_vkSetDeviceLoaderData set_device_loader_data
+        )
         :m_instance_layer{ instance_layer }, m_physical_device{ physical_device }, m_device{ device },
-        m_get_next_device_proc_addr{ get_device_proc_addr } {
+        m_get_next_device_proc_addr{ get_device_proc_addr },
+        m_set_device_loader_data{ set_device_loader_data }
+        {
     }
     ~water_chika_debug_device_layer() = default;
     PFN_vkVoidFunction GetDeviceProcAddr(const char* pName) {
@@ -695,6 +705,7 @@ public:
                     .commandBufferCount = 1
                 };
                 auto res = nextAllocateCommandBuffers(info.device, &create_info, &cmd_buf);
+                m_set_device_loader_data(m_device, cmd_buf);
                 assert(VK_SUCCESS == res);
             }
             else {
@@ -992,12 +1003,12 @@ private:
     VkDevice m_device;
     PFN_vkGetDeviceProcAddr m_get_next_device_proc_addr;
     std::map<std::string, void*> m_dispatch_table;
+    PFN_vkSetDeviceLoaderData m_set_device_loader_data;
 };
 
 // Vulkan Instance Layer
 class water_chika_debug_layer {
 public:
-
     static VkResult CreateInstance(const VkInstanceCreateInfo* pCreateInfo,
         const VkAllocationCallbacks* pAllocator,
         VkInstance* pInstance) {
@@ -1070,6 +1081,11 @@ public:
         m_get_next_device_proc_addr = device_chain_info->u.pLayerInfo->pfnNextGetDeviceProcAddr;
         device_chain_info->u.pLayerInfo = device_chain_info->u.pLayerInfo->pNext;
 
+        auto chain_info = reinterpret_cast<VkLayerDeviceCreateInfo*>(get_chain_info(pCreateInfo,
+                    VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO,
+                    VK_LOADER_DATA_CALLBACK));
+        auto set_device_loader_data = chain_info->u.pfnSetDeviceLoaderData;
+
         auto nextCreateDevice = reinterpret_cast<PFN_vkCreateDevice>(get_next_instance_proc_addr("vkCreateDevice"));
         auto res = nextCreateDevice(physical_device, pCreateInfo, pAllocator, pDevice);
         if (res == VK_SUCCESS) {
@@ -1077,7 +1093,9 @@ public:
                 this,
                 physical_device,
                 *pDevice,
-                m_get_next_device_proc_addr);
+                m_get_next_device_proc_addr,
+                set_device_loader_data
+                );
         }
         return res;
     }
