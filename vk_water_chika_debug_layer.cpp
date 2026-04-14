@@ -393,24 +393,24 @@ public:
                     return p.first;
                 });
         auto wait_for_fences = reinterpret_cast<PFN_vkWaitForFences>(get_next_device_proc_addr("vkWaitForFences"));
-        auto res = wait_for_fences(m_device,
+        if (used_fences.size() > 0) {
+            wait_for_fences(m_device,
                 used_fences.size(), used_fences.data(), VK_TRUE,
                 std::numeric_limits<uint64_t>::max());
-        if (VK_SUCCESS == res) {
-            auto destroy_fence = reinterpret_cast<PFN_vkDestroyFence>(get_next_device_proc_addr("vkDestroyFence"));
-            auto destroy_semaphore = reinterpret_cast<PFN_vkDestroySemaphore>(get_next_device_proc_addr("vkDestroySemaphore"));
-            for (auto& [fence,semaphores] : used_fence_semaphores) {
-                destroy_fence(m_device, fence, nullptr);
-                for (auto semaphore : semaphores) {
-                    destroy_semaphore(m_device, semaphore, nullptr);
-                }
-            }
-            for (auto fence : unused_fences) {
-                destroy_fence(m_device, fence, nullptr);
-            }
-            for (auto semaphore : unused_semaphores) {
+        }
+        auto destroy_fence = reinterpret_cast<PFN_vkDestroyFence>(get_next_device_proc_addr("vkDestroyFence"));
+        auto destroy_semaphore = reinterpret_cast<PFN_vkDestroySemaphore>(get_next_device_proc_addr("vkDestroySemaphore"));
+        for (auto& [fence,semaphores] : used_fence_semaphores) {
+            destroy_fence(m_device, fence, nullptr);
+            for (auto semaphore : semaphores) {
                 destroy_semaphore(m_device, semaphore, nullptr);
             }
+        }
+        for (auto fence : unused_fences) {
+            destroy_fence(m_device, fence, nullptr);
+        }
+        for (auto semaphore : unused_semaphores) {
+            destroy_semaphore(m_device, semaphore, nullptr);
         }
     }
     PFN_vkVoidFunction GetDeviceProcAddr(const char* pName) {
