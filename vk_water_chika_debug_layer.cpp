@@ -315,6 +315,9 @@ public:
     auto is_splittable() {
         return could_split;
     }
+    auto is_splitted() {
+        return could_split && m_command_buffers.size() > 1;
+    }
 
     static inline std::unordered_map<VkCommandBuffer, water_chika_debug_command_buffer_info> g_command_buffers;
 private:
@@ -657,13 +660,13 @@ public:
         for (auto& submit : std::span{pSubmits, submit_count}) {
             for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
                 auto& info = water_chika_debug_command_buffer_info::g_command_buffers[cmd_buf];
-                if (info.is_splittable()) {
+                if (info.is_splitted()) {
                     every_command_not_split = false;
                 }
             }
         }
 
-        if (4 < used_fence_semaphores.size()) {
+        if (16 < used_fence_semaphores.size()) {
             auto& [fence, semaphores] = used_fence_semaphores.front();
             auto wait_for_fences = reinterpret_cast<PFN_vkWaitForFences>(get_next_device_proc_addr("vkWaitForFences"));
             auto res = wait_for_fences(m_device, 1, &fence, VK_TRUE, 0);
@@ -699,7 +702,7 @@ public:
                 auto prev_semaphore = semaphore;
                 for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
                     auto& info = water_chika_debug_command_buffer_info::g_command_buffers[cmd_buf];
-                    if (info.is_splittable()) {
+                    if (info.is_splitted()) {
                         for (auto inner_cmd : info.splitted_command_buffers()) {
                             auto semaphore = get_or_create_semaphore();
                             semaphores.push_back(semaphore);
@@ -758,7 +761,7 @@ public:
                     used_fence_semaphores.emplace_back(fence, std::move(semaphores));
                 }
             }
-            nextQueueWaitIdle(queue);
+            //nextQueueWaitIdle(queue);
             nextQueueSubmit(queue, 0, nullptr, fence);
         }
         return VK_SUCCESS;
