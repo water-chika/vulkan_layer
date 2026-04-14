@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cassert>
 #include <mutex>
+#include <deque>
 
 #include <spirv_parser.hpp>
 
@@ -609,57 +610,99 @@ public:
             }
         }
 
+        if (4 < used_fence_semaphores.size()) {
+            auto& [fence, semaphores] = used_fence_semaphores.front();
+            auto wait_for_fences = reinterpret_cast<PFN_vkWaitForFences>(get_next_device_proc_addr("vkWaitForFences"));
+            auto res = wait_for_fences(m_device, 1, &fence, VK_TRUE, 0);
+            if (VK_SUCCESS == res) {
+                auto reset_fences = reinterpret_cast<PFN_vkResetFences>(get_next_device_proc_addr("vkResetFences"));
+                reset_fences(m_device, 1, &fence);
+                unused_fences.push_back(fence);
+                for (auto semaphore : semaphores) {
+                    unused_semaphores.push_back(semaphore);
+                }
+                used_fence_semaphores.pop_front();
+            }
+        }
+
         if (every_command_not_split) {
             return nextQueueSubmit(queue, submit_count, pSubmits, fence);
         }
         else {
             for (auto& submit : std::span{pSubmits, submit_count}) {
+                auto semaphores = std::vector<VkSemaphore>();
+                auto semaphore = get_or_create_semaphore();
+                semaphores.push_back(semaphore);
                 auto cmd_submit_info = VkSubmitInfo{
                     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                     .pNext = submit.pNext,
                     .waitSemaphoreCount = submit.waitSemaphoreCount,
                     .pWaitSemaphores = submit.pWaitSemaphores,
                     .pWaitDstStageMask = submit.pWaitDstStageMask,
+                    .signalSemaphoreCount = 1,
+                    .pSignalSemaphores = &semaphore
                 };
                 nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                auto prev_semaphore = semaphore;
                 for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
                     auto& info = water_chika_debug_command_buffer_info::g_command_buffers[cmd_buf];
                     if (info.is_splittable()) {
                         for (auto inner_cmd : info.splitted_command_buffers()) {
+                            auto semaphore = get_or_create_semaphore();
+                            semaphores.push_back(semaphore);
+                            VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
                             auto cmd_submit_info = VkSubmitInfo{
                                 .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                                .waitSemaphoreCount = 1,
+                                .pWaitSemaphores = &prev_semaphore,
+                                .pWaitDstStageMask = &wait_dst_stage_mask,
                                 .commandBufferCount = 1,
                                 .pCommandBuffers = &inner_cmd,
+                                .signalSemaphoreCount = 1,
+                                .pSignalSemaphores = &semaphore,
                             };
-                            nextQueueWaitIdle(queue);
                             auto res = nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                            prev_semaphore = semaphore;
                             if (VK_SUCCESS != res) {
                                 return res;
                             }
                         }
                     }
                     else {
+                        auto semaphore = get_or_create_semaphore();
+                        semaphores.push_back(semaphore);
+                        VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
                         auto cmd_submit_info = VkSubmitInfo{
                             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                            .waitSemaphoreCount = 1,
+                            .pWaitSemaphores = &prev_semaphore,
+                            .pWaitDstStageMask = &wait_dst_stage_mask,
                             .commandBufferCount = 1,
                             .pCommandBuffers = &cmd_buf,
+                            .signalSemaphoreCount = 1,
+                            .pSignalSemaphores = &semaphore
                         };
-                        nextQueueWaitIdle(queue);
                         auto res = nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                        prev_semaphore = semaphore;
                         if (VK_SUCCESS != res) {
                             return res;
                         }
                     }
                 }
                 {
+                    VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
                     auto cmd_submit_info = VkSubmitInfo{
                         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                         .pNext = submit.pNext,
+                        .waitSemaphoreCount = 1,
+                        .pWaitSemaphores = &prev_semaphore,
+                        .pWaitDstStageMask = &wait_dst_stage_mask,
                         .signalSemaphoreCount = submit.signalSemaphoreCount,
                         .pSignalSemaphores = submit.pSignalSemaphores
                     };
-                    nextQueueWaitIdle(queue);
-                    nextQueueSubmit(queue, 1, &cmd_submit_info, nullptr);
+                    auto fence = get_or_create_fence();
+                    nextQueueSubmit(queue, 1, &cmd_submit_info, fence);
+                    used_fence_semaphores.emplace_back(fence, std::move(semaphores));
                 }
             }
             nextQueueWaitIdle(queue);
@@ -719,6 +762,41 @@ protected:
         assert(g_command_buffers.contains(cmd));
         return g_command_buffers[cmd].command_buffers.back();
     }*/
+
+    VkFence get_or_create_fence() {
+        if (unused_fences.empty()) {
+            auto create_fence = reinterpret_cast<PFN_vkCreateFence>(get_next_device_proc_addr("vkCreateFence"));
+            VkFence fence;
+            auto create_info = VkFenceCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            };
+            auto res = create_fence(m_device, &create_info, nullptr, &fence);
+            assert(VK_SUCCESS == res);
+            return fence;
+        }
+        else {
+            auto fence = unused_fences.back();
+            unused_fences.pop_back();
+            return fence;
+        }
+    }
+    VkSemaphore get_or_create_semaphore() {
+        if (unused_semaphores.empty()) {
+            auto create_semaphore = reinterpret_cast<PFN_vkCreateSemaphore>(get_next_device_proc_addr("vkCreateSemaphore"));
+            VkSemaphore semaphore;
+            auto create_info = VkSemaphoreCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            };
+            auto res = create_semaphore(m_device, &create_info, nullptr, &semaphore);
+            assert(VK_SUCCESS == res);
+            return semaphore;
+        }
+        else {
+            auto semaphore = unused_semaphores.back();
+            unused_semaphores.pop_back();
+            return semaphore;
+        }
+    }
 private:
     struct command_pool_info {
         std::set<VkCommandBuffer> command_buffers;
@@ -736,6 +814,10 @@ private:
         bool hasDotProductInput4x8BitPackedKHR;
     };
     std::unordered_map<VkPipeline, pipeline_info> pipeline_infos;
+
+    std::deque<std::pair<VkFence, std::vector<VkSemaphore>>> used_fence_semaphores;
+    std::vector<VkFence> unused_fences;
+    std::vector<VkSemaphore> unused_semaphores;
 
     water_chika_debug_layer* m_instance_layer;
     VkPhysicalDevice m_physical_device;
