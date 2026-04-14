@@ -769,25 +769,10 @@ protected:
             VkCommandBuffer cmd,
             VkDevice device, VkCommandPool command_pool) {
         water_chika_debug_command_buffer_info::g_command_buffers.emplace(cmd, water_chika_debug_command_buffer_info{m_device, m_get_next_device_proc_addr, m_set_device_loader_data, command_pool, &pipeline_infos});
-        //assert(!g_command_buffers[cmd].command_buffers.empty());
     }
     inline static void free_command_buffer(VkCommandBuffer command_buffer) {
         reset(command_buffer);
     }
-    /*inline static std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> get_command_buffer_pipelines(VkCommandBuffer cmd) {
-        return g_command_buffers[cmd].pipelines;
-    }
-    inline static void add_command_buffer_pipeline(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VkPipeline pipeline) {
-        g_command_buffers[cmd].pipelines.emplace_back(bind_point, pipeline);
-    }
-    inline static VkDevice command_buffer_to_device(VkCommandBuffer cmd) {
-        assert(g_command_buffers.contains(cmd));
-        return g_command_buffers[cmd].device;
-    }
-    inline VkCommandBuffer current_command_buffer(VkCommandBuffer cmd) {
-        assert(g_command_buffers.contains(cmd));
-        return g_command_buffers[cmd].command_buffers.back();
-    }*/
 
     VkFence get_or_create_fence() {
         if (unused_fences.empty()) {
@@ -871,24 +856,6 @@ public:
             g_instances.emplace(*pInstance, layer);
         }
         return res;
-    }
-    void get_physical_device_memory_properties(
-        VkPhysicalDevice physical_device,
-        VkPhysicalDeviceMemoryProperties* pMemoryProperties
-    ) {
-        auto nextGetPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(get_next_instance_proc_addr("vkGetPhysicalDeviceMemoryProperties"));
-        nextGetPhysicalDeviceMemoryProperties(physical_device, pMemoryProperties);
-        for (uint32_t i = 0; i < pMemoryProperties->memoryTypeCount; i++) {
-            //pMemoryProperties->memoryTypes[i].propertyFlags &= ~VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        }
-    }
-    static void GetPhysicalDeviceMemoryProperties(
-        VkPhysicalDevice physical_device,
-        VkPhysicalDeviceMemoryProperties* pMemoryProperties
-    ) {
-        auto instance = g_physical_devices[physical_device];
-        auto& layer = g_instances[instance];
-        layer.get_physical_device_memory_properties(physical_device, pMemoryProperties);
     }
     static VkResult EnumeratePhysicalDevices(
         VkInstance instance,
@@ -1002,13 +969,6 @@ extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_EnumeratePhysic
 ) {
     return water_chika_debug_layer::EnumeratePhysicalDevices(instance, pPhysicalDeviceCount, pPhysicalDevices);
 }
-extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_GetPhysicalDeviceMemoryProperties(
-    VkPhysicalDevice physical_device,
-    VkPhysicalDeviceMemoryProperties * pMemoryProperties
-) {
-    return water_chika_debug_layer::GetPhysicalDeviceMemoryProperties(physical_device, pMemoryProperties);
-}
-
 auto get_instance_layer_procs() {
     std::unordered_map<std::string, void*> funcs{
         std::pair<std::string,void*>{std::string{"vkGetInstanceProcAddr"}, (void*)water_chika_debug_layer_GetInstanceProcAddr},
@@ -1016,7 +976,6 @@ auto get_instance_layer_procs() {
         {"vkEnumeratePhysicalDevices", (void*)water_chika_debug_layer_EnumeratePhysicalDevices},
         {"vkGetDeviceProcAddr", (void*)water_chika_debug_layer_GetDeviceProcAddr},
         {"vkCreateDevice", (void*)water_chika_debug_layer_CreateDevice},
-        {"vkGetPhysicalDeviceMemoryProperties", (void*)water_chika_debug_layer_GetPhysicalDeviceMemoryProperties},
     };
     return funcs;
 }
