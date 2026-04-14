@@ -6,6 +6,7 @@ add_library(vk_water_chika_debug_layer SHARED
     vk_water_chika_debug_layer.cpp
     vk_water_chika_debug_layer.hpp
     ${CMAKE_CURRENT_BINARY_DIR}/vk_cmd_buf_split_info.hpp
+    ${CMAKE_CURRENT_BINARY_DIR}/device_dispatch.hpp
 )
 
 target_include_directories(vk_water_chika_debug_layer PUBLIC
@@ -24,6 +25,12 @@ add_custom_command(
     COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate_cmd_buf_layer.py ${vulkan_registry_xml} --output ${CMAKE_CURRENT_BINARY_DIR}/vk_cmd_buf_split_info.hpp
     DEPENDS ${vulkan_registry_xml} ${CMAKE_CURRENT_SOURCE_DIR}/generate_cmd_buf_layer.py
 )
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/device_dispatch.hpp
+    COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate_device_dispatch.py ${vulkan_registry_xml} --output ${CMAKE_CURRENT_BINARY_DIR}/device_dispatch.hpp
+    DEPENDS ${vulkan_registry_xml} ${CMAKE_CURRENT_SOURCE_DIR}/generate_device_dispatch.py
+)
+
 
 add_executable(vk_layer_generator
     vk_layer_generator.cpp

@@ -39,8 +39,229 @@ VkLayerInstanceCreateInfo* get_chain_info(const void* chain, VkStructureType sTy
     }
     return nullptr;
 }
+
+class water_chika_debug_command_buffer_info : public water_chika::cmd_buf_split_info<water_chika_debug_command_buffer_info> {
+public:
+    water_chika_debug_command_buffer_info() = default;
+    water_chika_debug_command_buffer_info(
+        VkDevice device,
+        PFN_vkGetDeviceProcAddr get_device_proc_addr
+            )
+    :
+        m_get_next_device_proc_addr{ get_device_proc_addr }
+    {
+    }
+    PFN_vkVoidFunction get_next_device_proc_addr(const char* pName) {
+        if (m_dispatch_table.contains(pName)) {
+            return reinterpret_cast<PFN_vkVoidFunction>(m_dispatch_table[pName]);
+        }
+        auto procAddr = m_get_next_device_proc_addr(m_device, pName);
+        m_dispatch_table.emplace(std::string{pName}, (void*)procAddr);
+        return procAddr;
+    }
+
+    VkResult ResetCommandBuffer(
+        VkCommandBuffer commandBuffer,
+        VkCommandBufferResetFlags flags
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkResetCommandBuffer>(get_next_device_proc_addr("vkResetCommandBuffer"));
+        auto res = next_call(commandBuffer, flags);
+        /*auto& info = g_command_buffers[command_buffer];
+        for (auto& c : info.command_buffers) {
+            auto res = next_call(c, flags);
+            assert(VK_SUCCESS == res);
+        }
+        reset(command_buffer);*/
+        return VK_SUCCESS;
+    }
+    void reset() {
+        /*pipelines.clear();
+        for (auto iter = info.command_buffers.begin()+1; iter < info.command_buffers.end(); ++iter) {
+            info.unused_command_buffers.emplace_back(*iter);
+        }
+        info.command_buffers.resize(1);*/
+    }
+
+    void cmdBindPipeline(
+        VkCommandBuffer command_buffer,
+        VkPipelineBindPoint pipeline_bind_point,
+        VkPipeline pipeline) {
+        auto nextBindPipeline = reinterpret_cast<PFN_vkCmdBindPipeline>(get_next_device_proc_addr("vkCmdBindPipeline"));
+
+        //add_command_buffer_pipeline(command_buffer, pipeline_bind_point, pipeline);
+        //auto pipelines = get_command_buffer_pipelines(command_buffer);
+        //std::cerr << "command bind pipeline:" << std::endl;
+        //std::cerr << "bound pipelines:" << std::endl;
+        //for (auto& [point, pipeline] : pipelines) {
+            //auto pipeline_info = pipeline_infos[pipeline];
+            //std::cerr << point << " " << pipeline << ": ";
+            //std::cerr << pipeline_info.hasCooperativeMatrixKHR << ",";
+            //std::cerr << pipeline_info.hasDotProductInput4x8BitPackedKHR<< std::endl;
+        //}
+
+        VkCommandBuffer cmd_buf = command_buffer;
+        //auto& info = g_command_buffers[command_buffer];
+
+        /*if (true) {
+            if (info.unused_command_buffers.empty()) {
+                auto nextAllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(get_next_device_proc_addr("vkAllocateCommandBuffers"));
+                VkCommandBufferAllocateInfo create_info{
+                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                    .pNext = nullptr,
+                    .commandPool = info.command_pool,
+                    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                    .commandBufferCount = 1
+                };
+                auto res = nextAllocateCommandBuffers(info.device, &create_info, &cmd_buf);
+                m_set_device_loader_data(m_device, cmd_buf);
+                assert(VK_SUCCESS == res);
+            }
+            else {
+                cmd_buf = info.unused_command_buffers.back();
+                info.unused_command_buffers.pop_back();
+            }
+            info.command_buffers.emplace_back(cmd_buf);
+            auto nextBeginCommandBuffer = reinterpret_cast<PFN_vkBeginCommandBuffer>(get_next_device_proc_addr("vkBeginCommandBuffer"));
+            auto begin_info = VkCommandBufferBeginInfo{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            };
+            nextBeginCommandBuffer(cmd_buf, &begin_info);
+            if (!info.pushed_constants.empty()) {
+                auto& pushed_constant = info.pushed_constants.back();
+                auto nextCmdPushConstants = reinterpret_cast<PFN_vkCmdPushConstants>(get_next_device_proc_addr("vkCmdPushConstants"));
+                nextCmdPushConstants(cmd_buf, pushed_constant.layout, pushed_constant.stage_flags, pushed_constant.offset,
+                        pushed_constant.values.size(), pushed_constant.values.data());
+            }
+            if (!info.bound_descriptor_sets.empty()) {
+                auto& sets = info.bound_descriptor_sets.back();
+                auto nextCmdBindDescriptorSets = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(get_next_device_proc_addr("vkCmdBindDescriptorSets"));
+                nextCmdBindDescriptorSets(cmd_buf,
+                        sets.pipeline_bind_point, sets.layout, sets.first_set,
+                        sets.descriptor_sets.size(), sets.descriptor_sets.data(),
+                        sets.dynamic_offsets.size(), sets.dynamic_offsets.data());
+            }
+
+            cmd_buf = current_command_buffer(command_buffer);
+        }*/
+
+        nextBindPipeline(cmd_buf, pipeline_bind_point, pipeline);
+    }
+    void CmdPushConstants(
+        VkCommandBuffer command_buffer,
+        VkPipelineLayout layout,
+        VkShaderStageFlags stageFlags,
+        uint32_t offset,
+        uint32_t size,
+        const void* values
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkCmdPushConstants>(get_next_device_proc_addr("vkCmdPushConstants"));
+
+        auto cmd_buf = command_buffer;
+        //cmd_buf = current_command_buffer(command_buffer);
+        next_call(cmd_buf, layout, stageFlags, offset, size, values);
+
+        /*auto& info = g_command_buffers[command_buffer];
+        info.pushed_constants.emplace_back(layout, stageFlags, offset,
+                std::vector<uint8_t>{
+                    reinterpret_cast<const uint8_t*>(values), reinterpret_cast<const uint8_t*>(values)+size});
+                    */
+    }
+    void CmdBindDescriptorSets(
+        VkCommandBuffer command_buffer,
+        VkPipelineBindPoint pipeline_bind_point,
+        VkPipelineLayout layout,
+        uint32_t first_set,
+        uint32_t descriptor_set_count,
+        const VkDescriptorSet* descriptor_sets,
+        uint32_t dynamic_offset_count,
+        const uint32_t* dynamic_offsets
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(get_next_device_proc_addr("vkCmdBindDescriptorSets"));
+
+        auto cmd_buf = command_buffer;
+        //cmd_buf = current_command_buffer(command_buffer);
+        next_call(cmd_buf, pipeline_bind_point, layout, first_set, descriptor_set_count, descriptor_sets,
+                dynamic_offset_count, dynamic_offsets);
+
+        /*auto& info = g_command_buffers[command_buffer];
+        info.bound_descriptor_sets.emplace_back(
+                pipeline_bind_point, layout, first_set,
+                std::vector<VkDescriptorSet>{descriptor_sets, descriptor_sets + descriptor_set_count},
+                std::vector<uint32_t>{dynamic_offsets, dynamic_offsets + dynamic_offset_count});
+                */
+    }
+    void CmdDispatch(
+        VkCommandBuffer command_buffer,
+        uint32_t group_count_x,
+        uint32_t group_count_y,
+        uint32_t group_count_z
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkCmdDispatch>(get_next_device_proc_addr("vkCmdDispatch"));
+
+        auto cmd_buf = command_buffer;
+        //cmd_buf = current_command_buffer(command_buffer);
+        next_call(cmd_buf, group_count_x, group_count_y, group_count_z);
+    }
+    VkResult BeginCommandBuffer(
+        VkCommandBuffer command_buffer,
+        const VkCommandBufferBeginInfo* begin_info
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkBeginCommandBuffer>(get_next_device_proc_addr("vkBeginCommandBuffer"));
+        auto res = next_call(command_buffer, begin_info);
+        return res;
+    }
+    VkResult EndCommandBuffer(
+        VkCommandBuffer command_buffer
+    ) {
+        auto next_call = reinterpret_cast<PFN_vkEndCommandBuffer>(get_next_device_proc_addr("vkEndCommandBuffer"));
+        auto cmd_buf = command_buffer;
+        auto res = next_call(cmd_buf);
+        /*cmd_buf = current_command_buffer(command_buffer);
+        auto& info = g_command_buffers[command_buffer];
+        auto res = VK_SUCCESS;
+        for (auto cmd_buf : info.command_buffers) {
+            auto res_i = next_call(cmd_buf);
+            if (VK_SUCCESS != res_i) {
+                res = res_i;
+            }
+        }*/
+        return res;
+    }
+
+    static std::unordered_map<VkCommandBuffer, water_chika_debug_command_buffer_info> g_command_buffers;
+private:
+    VkDevice m_device;
+    PFN_vkGetDeviceProcAddr m_get_next_device_proc_addr;
+    std::map<std::string, void*> m_dispatch_table;
+
+    struct command_buffer {
+        VkDevice device;
+        VkCommandPool command_pool;
+        std::vector<VkCommandBuffer> command_buffers;
+        std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> pipelines;
+
+        std::vector<VkCommandBuffer> unused_command_buffers;
+
+        struct constant {
+            VkPipelineLayout layout;
+            VkShaderStageFlags stage_flags;
+            uint32_t offset;
+            std::vector<uint8_t> values;
+        };
+        std::vector<constant> pushed_constants;
+
+        struct descriptor_sets {
+            VkPipelineBindPoint pipeline_bind_point;
+            VkPipelineLayout layout;
+            uint32_t first_set;
+            std::vector<VkDescriptorSet> descriptor_sets;
+            std::vector<uint32_t> dynamic_offsets;
+        };
+        std::vector<descriptor_sets> bound_descriptor_sets;
+    };
+};
 class water_chika_debug_layer;
-class water_chika_debug_device_layer {
+class water_chika_debug_device_layer{
 public:
     static void add_device(
         water_chika_debug_layer* instance_layer,
@@ -458,27 +679,6 @@ public:
         auto& layer = g_devices[device];
         return layer.AllocateCommandBuffers(pAllocateInfo, pCommandBuffers);
     }
-    VkResult reset_command_buffer(
-        VkCommandBuffer command_buffer,
-        VkCommandBufferResetFlags flags
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkResetCommandBuffer>(get_next_device_proc_addr("vkResetCommandBuffer"));
-        auto& info = g_command_buffers[command_buffer];
-        for (auto& c : info.command_buffers) {
-            auto res = next_call(c, flags);
-            assert(VK_SUCCESS == res);
-        }
-        reset(command_buffer);
-        return VK_SUCCESS;
-    }
-    static VkResult ResetCommandBuffer(
-        VkCommandBuffer commandBuffer,
-        VkCommandBufferResetFlags flags
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.reset_command_buffer(commandBuffer, flags);
-    }
     void free_command_buffers(
         VkDevice device,
         VkCommandPool command_pool,
@@ -500,39 +700,6 @@ public:
         auto& layer = g_devices[device];
         return layer.free_command_buffers(device, commandPool, commandBufferCount, pCommandBuffers);
     }
-    void cmd_draw_indexed(
-        VkCommandBuffer command_buffer,
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t first_index,
-        int32_t vertex_offset,
-        uint32_t first_instance
-    ) {
-        auto nextCmdDrawIndexed = reinterpret_cast<PFN_vkCmdDrawIndexed>(get_next_device_proc_addr("vkCmdDrawIndexed"));
-        /* {
-            auto nextCmdPipelineBarrier = reinterpret_cast<PFN_vkCmdPipelineBarrier>(get_next_device_proc_addr("vkCmdPipelineBarrier"));
-            VkMemoryBarrier memory_barrier{
-                .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-            };
-            nextCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT ,
-                0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
-        }*/
-        nextCmdDrawIndexed(command_buffer, indexCount, instanceCount, first_index, vertex_offset, first_instance);
-    }
-    static void CmdDrawIndexed(
-        VkCommandBuffer command_buffer,
-        uint32_t indexCount,
-        uint32_t instanceCount,
-        uint32_t first_index,
-        int32_t vertex_offset,
-        uint32_t first_instance
-    ) {
-        auto device = command_buffer_to_device(command_buffer);
-        auto& layer = g_devices[device];
-        layer.cmd_draw_indexed(command_buffer, indexCount, instanceCount, first_index, vertex_offset, first_instance);
-    }
     VkResult queue_submit(
         VkQueue queue,
         uint32_t submit_count,
@@ -544,17 +711,17 @@ public:
         bool every_command_not_split = true;
         for (auto& submit : std::span{pSubmits, submit_count}) {
             for (auto& cmd_buf : std::span{submit.pCommandBuffers, submit.commandBufferCount}) {
-                auto& info = g_command_buffers[cmd_buf];
+                /*auto& info = g_command_buffers[cmd_buf];
                 if (info.command_buffers.size() != 1) {
                     every_command_not_split = false;
-                }
+                }*/
             }
         }
 
         if (false && every_command_not_split) {
             return nextQueueSubmit(queue, submit_count, pSubmits, fence);
         }
-        else {
+        /*else {
             for (auto& submit : std::span{pSubmits, submit_count}) {
                 auto cmd_submit_info = VkSubmitInfo{
                     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -592,7 +759,7 @@ public:
             }
             nextQueueWaitIdle(queue);
             nextQueueSubmit(queue, 0, nullptr, fence);
-        }
+        }*/
         return VK_SUCCESS;
     }
     static VkResult QueueSubmit(
@@ -655,250 +822,8 @@ public:
         auto& layer = g_devices[device];
         return layer.BindBufferMemory(buffer, memory, memoryOffset);
     }
-    void cmd_bind_index_buffer(
-        VkCommandBuffer commandBuffer,
-        VkBuffer buffer,
-        VkDeviceSize offset,
-        VkIndexType indexType
-        ) {
-        auto nextCmdBindIndexBuffer = reinterpret_cast<PFN_vkCmdBindIndexBuffer>(get_next_device_proc_addr("vkCmdBindIndexBuffer"));
-        return nextCmdBindIndexBuffer(commandBuffer, buffer, offset, indexType);
-    }
-    static void CmdBindIndexBuffer(
-        VkCommandBuffer commandBuffer,
-        VkBuffer buffer,
-        VkDeviceSize offset,
-        VkIndexType indexType
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_bind_index_buffer(commandBuffer, buffer, offset, indexType);
-    }
-    void cmd_bind_pipeline(
-        VkCommandBuffer command_buffer,
-        VkPipelineBindPoint pipeline_bind_point,
-        VkPipeline pipeline) {
-        auto nextBindPipeline = reinterpret_cast<PFN_vkCmdBindPipeline>(get_next_device_proc_addr("vkCmdBindPipeline"));
 
-        add_command_buffer_pipeline(command_buffer, pipeline_bind_point, pipeline);
-        auto pipelines = get_command_buffer_pipelines(command_buffer);
-        //std::cerr << "command bind pipeline:" << std::endl;
-        //std::cerr << "bound pipelines:" << std::endl;
-        for (auto& [point, pipeline] : pipelines) {
-            auto pipeline_info = pipeline_infos[pipeline];
-            //std::cerr << point << " " << pipeline << ": ";
-            //std::cerr << pipeline_info.hasCooperativeMatrixKHR << ",";
-            //std::cerr << pipeline_info.hasDotProductInput4x8BitPackedKHR<< std::endl;
-        }
-
-        VkCommandBuffer cmd_buf = command_buffer;
-        auto& info = g_command_buffers[command_buffer];
-
-        if (true) {
-            if (info.unused_command_buffers.empty()) {
-                auto nextAllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(get_next_device_proc_addr("vkAllocateCommandBuffers"));
-                VkCommandBufferAllocateInfo create_info{
-                    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                    .pNext = nullptr,
-                    .commandPool = info.command_pool,
-                    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                    .commandBufferCount = 1
-                };
-                auto res = nextAllocateCommandBuffers(info.device, &create_info, &cmd_buf);
-                m_set_device_loader_data(m_device, cmd_buf);
-                assert(VK_SUCCESS == res);
-            }
-            else {
-                cmd_buf = info.unused_command_buffers.back();
-                info.unused_command_buffers.pop_back();
-            }
-            info.command_buffers.emplace_back(cmd_buf);
-            auto nextBeginCommandBuffer = reinterpret_cast<PFN_vkBeginCommandBuffer>(get_next_device_proc_addr("vkBeginCommandBuffer"));
-            auto begin_info = VkCommandBufferBeginInfo{
-                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-            };
-            nextBeginCommandBuffer(cmd_buf, &begin_info);
-            if (!info.pushed_constants.empty()) {
-                auto& pushed_constant = info.pushed_constants.back();
-                auto nextCmdPushConstants = reinterpret_cast<PFN_vkCmdPushConstants>(get_next_device_proc_addr("vkCmdPushConstants"));
-                nextCmdPushConstants(cmd_buf, pushed_constant.layout, pushed_constant.stage_flags, pushed_constant.offset,
-                        pushed_constant.values.size(), pushed_constant.values.data());
-            }
-            if (!info.bound_descriptor_sets.empty()) {
-                auto& sets = info.bound_descriptor_sets.back();
-                auto nextCmdBindDescriptorSets = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(get_next_device_proc_addr("vkCmdBindDescriptorSets"));
-                nextCmdBindDescriptorSets(cmd_buf,
-                        sets.pipeline_bind_point, sets.layout, sets.first_set,
-                        sets.descriptor_sets.size(), sets.descriptor_sets.data(),
-                        sets.dynamic_offsets.size(), sets.dynamic_offsets.data());
-            }
-
-            cmd_buf = current_command_buffer(command_buffer);
-        }
-
-        nextBindPipeline(cmd_buf, pipeline_bind_point, pipeline);
-    }
-    static void CmdBindPipeline(
-        VkCommandBuffer command_buffer,
-        VkPipelineBindPoint pipeline_bind_point,
-        VkPipeline pipeline) {
-        auto device = command_buffer_to_device(command_buffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_bind_pipeline(command_buffer, pipeline_bind_point, pipeline);
-    }
-    void cmd_bind_vertex_buffers(
-        VkCommandBuffer command_buffer,
-        uint32_t first_binding,
-        uint32_t binding_count,
-        const VkBuffer* pBuffers,
-        const VkDeviceSize* pOffsets
-    ) {
-        auto nextCmdBindVertexBuffers = reinterpret_cast<PFN_vkCmdBindVertexBuffers>(get_next_device_proc_addr("vkCmdBindVertexBuffers"));
-        return nextCmdBindVertexBuffers(command_buffer, first_binding, binding_count, pBuffers, pOffsets);
-    }
-    static void CmdBindVertexBuffers(
-        VkCommandBuffer command_buffer,
-        uint32_t first_binding,
-        uint32_t binding_count,
-        const VkBuffer* pBuffers,
-        const VkDeviceSize* pOffsets
-    ) {
-        auto device = command_buffer_to_device(command_buffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_bind_vertex_buffers(command_buffer, first_binding, binding_count, pBuffers, pOffsets);
-    }
-    void cmd_push_constants(
-        VkCommandBuffer command_buffer,
-        VkPipelineLayout layout,
-        VkShaderStageFlags stageFlags,
-        uint32_t offset,
-        uint32_t size,
-        const void* values
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkCmdPushConstants>(get_next_device_proc_addr("vkCmdPushConstants"));
-
-        auto cmd_buf = command_buffer;
-        cmd_buf = current_command_buffer(command_buffer);
-        next_call(cmd_buf, layout, stageFlags, offset, size, values);
-
-        auto& info = g_command_buffers[command_buffer];
-        info.pushed_constants.emplace_back(layout, stageFlags, offset,
-                std::vector<uint8_t>{
-                    reinterpret_cast<const uint8_t*>(values), reinterpret_cast<const uint8_t*>(values)+size});
-    }
-    static void CmdPushConstants(
-        VkCommandBuffer commandBuffer,
-        VkPipelineLayout layout,
-        VkShaderStageFlags stageFlags,
-        uint32_t offset,
-        uint32_t size,
-        const void* pValues
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_push_constants(commandBuffer, layout, stageFlags, offset, size, pValues);
-    }
-    void cmd_bind_descriptor_sets(
-        VkCommandBuffer command_buffer,
-        VkPipelineBindPoint pipeline_bind_point,
-        VkPipelineLayout layout,
-        uint32_t first_set,
-        uint32_t descriptor_set_count,
-        const VkDescriptorSet* descriptor_sets,
-        uint32_t dynamic_offset_count,
-        const uint32_t* dynamic_offsets
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(get_next_device_proc_addr("vkCmdBindDescriptorSets"));
-
-        auto cmd_buf = command_buffer;
-        cmd_buf = current_command_buffer(command_buffer);
-        next_call(cmd_buf, pipeline_bind_point, layout, first_set, descriptor_set_count, descriptor_sets,
-                dynamic_offset_count, dynamic_offsets);
-
-        auto& info = g_command_buffers[command_buffer];
-        info.bound_descriptor_sets.emplace_back(
-                pipeline_bind_point, layout, first_set,
-                std::vector<VkDescriptorSet>{descriptor_sets, descriptor_sets + descriptor_set_count},
-                std::vector<uint32_t>{dynamic_offsets, dynamic_offsets + dynamic_offset_count});
-    }
-    static void CmdBindDescriptorSets(
-        VkCommandBuffer commandBuffer,
-        VkPipelineBindPoint pipelineBindPoint,
-        VkPipelineLayout layout,
-        uint32_t firstSet,
-        uint32_t descriptorSetCount,
-        const VkDescriptorSet* pDescriptorSets,
-        uint32_t dynamicOffsetCount,
-        const uint32_t* pDynamicOffsets
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_bind_descriptor_sets(commandBuffer, pipelineBindPoint, layout,
-            firstSet, descriptorSetCount,  pDescriptorSets,
-            dynamicOffsetCount, pDynamicOffsets
-        );
-    }
-    void cmd_dispatch(
-        VkCommandBuffer command_buffer,
-        uint32_t group_count_x,
-        uint32_t group_count_y,
-        uint32_t group_count_z
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkCmdDispatch>(get_next_device_proc_addr("vkCmdDispatch"));
-
-        auto cmd_buf = command_buffer;
-        cmd_buf = current_command_buffer(command_buffer);
-        next_call(cmd_buf, group_count_x, group_count_y, group_count_z);
-    }
-    static void CmdDispatch(
-        VkCommandBuffer commandBuffer,
-        uint32_t groupCountX,
-        uint32_t groupCountY,
-        uint32_t groupCountZ
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.cmd_dispatch(commandBuffer, groupCountX, groupCountY, groupCountZ);
-    }
-    VkResult begin_command_buffer(
-        VkCommandBuffer command_buffer,
-        const VkCommandBufferBeginInfo* begin_info
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkBeginCommandBuffer>(get_next_device_proc_addr("vkBeginCommandBuffer"));
-        auto res = next_call(command_buffer, begin_info);
-        return res;
-    }
-    static VkResult BeginCommandBuffer(
-        VkCommandBuffer commandBuffer,
-        const VkCommandBufferBeginInfo* pBeginInfo
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.begin_command_buffer(commandBuffer, pBeginInfo);
-    }
-    VkResult end_command_buffer(
-        VkCommandBuffer command_buffer
-    ) {
-        auto next_call = reinterpret_cast<PFN_vkEndCommandBuffer>(get_next_device_proc_addr("vkEndCommandBuffer"));
-        auto cmd_buf = command_buffer;
-        cmd_buf = current_command_buffer(command_buffer);
-        auto& info = g_command_buffers[command_buffer];
-        auto res = VK_SUCCESS;
-        for (auto cmd_buf : info.command_buffers) {
-            auto res_i = next_call(cmd_buf);
-            if (VK_SUCCESS != res_i) {
-                res = res_i;
-            }
-        }
-        return res;
-    }
-    static VkResult EndCommandBuffer(
-        VkCommandBuffer commandBuffer
-    ) {
-        auto device = command_buffer_to_device(commandBuffer);
-        auto& layer = g_devices[device];
-        return layer.end_command_buffer(commandBuffer);
-    }
+    inline static std::unordered_map<VkDevice, water_chika_debug_device_layer> g_devices;
 
 protected:
     inline void create(VkCommandPool command_pool) {
@@ -915,19 +840,26 @@ protected:
             reset(command_buffer);
         }
     }
+    inline static void reset(VkCommandBuffer command_buffer) {
+        auto& info = water_chika_debug_command_buffer_info::g_command_buffers[command_buffer];
+        info.reset();
+    }
     inline void destroy(VkCommandPool command_pool) {
         for (const auto& command_buffer : command_buffers(command_pool)) {
             free_command_buffer(command_buffer);
         }
         command_pools.erase(command_pool);
     }
-    inline static void add_command_buffer(
+    inline void add_command_buffer(
             VkCommandBuffer cmd,
             VkDevice device, VkCommandPool command_pool) {
-        g_command_buffers.emplace(cmd, command_buffer{device, command_pool, {cmd}, {}, {}});
-        assert(!g_command_buffers[cmd].command_buffers.empty());
+        water_chika_debug_command_buffer_info::g_command_buffers.emplace(cmd, water_chika_debug_command_buffer_info{m_device, m_get_next_device_proc_addr});
+        //assert(!g_command_buffers[cmd].command_buffers.empty());
     }
-    inline static std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> get_command_buffer_pipelines(VkCommandBuffer cmd) {
+    inline static void free_command_buffer(VkCommandBuffer command_buffer) {
+        reset(command_buffer);
+    }
+    /*inline static std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> get_command_buffer_pipelines(VkCommandBuffer cmd) {
         return g_command_buffers[cmd].pipelines;
     }
     inline static void add_command_buffer_pipeline(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VkPipeline pipeline) {
@@ -937,55 +869,17 @@ protected:
         assert(g_command_buffers.contains(cmd));
         return g_command_buffers[cmd].device;
     }
-    inline static void reset(VkCommandBuffer command_buffer) {
-        auto& info = g_command_buffers[command_buffer];
-        info.pipelines.clear();
-        for (auto iter = info.command_buffers.begin()+1; iter < info.command_buffers.end(); ++iter) {
-            info.unused_command_buffers.emplace_back(*iter);
-        }
-        info.command_buffers.resize(1);
-    }
-    inline static void free_command_buffer(VkCommandBuffer command_buffer) {
-        reset(command_buffer);
-    }
     inline VkCommandBuffer current_command_buffer(VkCommandBuffer cmd) {
         assert(g_command_buffers.contains(cmd));
         return g_command_buffers[cmd].command_buffers.back();
-    }
+    }*/
 private:
-    inline static std::unordered_map<VkDevice, water_chika_debug_device_layer> g_devices;
     inline static std::unordered_map<VkQueue, VkDevice> g_queues;
     struct command_pool_info {
         std::set<VkCommandBuffer> command_buffers;
     };
     std::map<VkCommandPool, command_pool_info> command_pools;
 
-    struct command_buffer {
-        VkDevice device;
-        VkCommandPool command_pool;
-        std::vector<VkCommandBuffer> command_buffers;
-        std::vector<std::pair<VkPipelineBindPoint, VkPipeline>> pipelines;
-
-        std::vector<VkCommandBuffer> unused_command_buffers;
-
-        struct constant {
-            VkPipelineLayout layout;
-            VkShaderStageFlags stage_flags;
-            uint32_t offset;
-            std::vector<uint8_t> values;
-        };
-        std::vector<constant> pushed_constants;
-
-        struct descriptor_sets {
-            VkPipelineBindPoint pipeline_bind_point;
-            VkPipelineLayout layout;
-            uint32_t first_set;
-            std::vector<VkDescriptorSet> descriptor_sets;
-            std::vector<uint32_t> dynamic_offsets;
-        };
-        std::vector<descriptor_sets> bound_descriptor_sets;
-    };
-    inline static std::unordered_map<VkCommandBuffer, command_buffer> g_command_buffers;
 
     struct shader_module_info {
         bool hasCooperativeMatrixKHR;
@@ -1002,7 +896,7 @@ private:
     VkPhysicalDevice m_physical_device;
     VkDevice m_device;
     PFN_vkGetDeviceProcAddr m_get_next_device_proc_addr;
-    std::map<std::string, void*> m_dispatch_table;
+    std::unordered_map<std::string, void*> m_dispatch_table;
     PFN_vkSetDeviceLoaderData m_set_device_loader_data;
 };
 
@@ -1299,12 +1193,6 @@ extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_AllocateCommand
 ) {
     return water_chika_debug_device_layer::AllocateCommandBuffers(device, pAllocateInfo, pCommandBuffers);
 }
-extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_ResetCommandBuffer(
-    VkCommandBuffer commandBuffer,
-    VkCommandBufferResetFlags flags
-) {
-    return water_chika_debug_device_layer::ResetCommandBuffer(commandBuffer, flags);
-}
 extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_FreeCommandBuffers(
     VkDevice device,
     VkCommandPool commandPool,
@@ -1314,16 +1202,6 @@ extern "C" DLLEXPORT void VKAPI_CALL water_chika_debug_layer_FreeCommandBuffers(
     return water_chika_debug_device_layer::FreeCommandBuffers(device, commandPool, commandBufferCount, pCommandBuffers);
 }
 
-void VKAPI_CALL water_chika_debug_layer_CmdDrawIndexed(
-    VkCommandBuffer commandBuffer,
-    uint32_t indexCount,
-    uint32_t instanceCount,
-    uint32_t firstIndex,
-    int32_t vertexOffset,
-    uint32_t firstInstance
-) {
-    return water_chika_debug_device_layer::CmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-}
 
 VkResult VKAPI_CALL water_chika_debug_layer_QueueSubmit(
     VkQueue queue,
@@ -1358,124 +1236,6 @@ VkResult VKAPI_CALL water_chika_debug_layer_BindBufferMemory(
     return water_chika_debug_device_layer::BindBufferMemory(device, buffer, memory, memoryOffset);
 }
 
-void VKAPI_CALL water_chika_debug_layer_CmdBindIndexBuffer(
-    VkCommandBuffer commandBuffer,
-    VkBuffer buffer,
-    VkDeviceSize offset,
-    VkIndexType indexType
-) {
-    return water_chika_debug_device_layer::CmdBindIndexBuffer(commandBuffer, buffer, offset, indexType);
-}
-
-void VKAPI_CALL water_chika_debug_layer_CmdBindPipeline(
-    VkCommandBuffer commandBuffer,
-    VkPipelineBindPoint pipelineBindPoint,
-    VkPipeline pipeline
-) {
-    return water_chika_debug_device_layer::CmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
-}
-
-void VKAPI_CALL water_chika_debug_layer_CmdBindVertexBuffers(
-    VkCommandBuffer commandBuffer,
-    uint32_t firstBinding,
-    uint32_t bindingCount,
-    const VkBuffer* pBuffers,
-    const VkDeviceSize* pOffsets
-) {
-    return water_chika_debug_device_layer::CmdBindVertexBuffers(commandBuffer, firstBinding, bindingCount, pBuffers, pOffsets);
-}
-void VKAPI_CALL water_chika_debug_layer_CmdPushConstants(
-    VkCommandBuffer commandBuffer,
-    VkPipelineLayout layout,
-    VkShaderStageFlags stageFlags,
-    uint32_t offset,
-    uint32_t size,
-    const void* pValues
-) {
-    return water_chika_debug_device_layer::CmdPushConstants(commandBuffer, layout, stageFlags, offset, size, pValues);
-}
-void VKAPI_CALL water_chika_debug_layer_CmdBindDescriptorSets(
-    VkCommandBuffer commandBuffer,
-    VkPipelineBindPoint pipelineBindPoint,
-    VkPipelineLayout layout,
-    uint32_t firstSet,
-    uint32_t descriptorSetCount,
-    const VkDescriptorSet* pDescriptorSets,
-    uint32_t dynamicOffsetCount,
-    const uint32_t* pDynamicOffsets
-) {
-    return water_chika_debug_device_layer::CmdBindDescriptorSets(
-        commandBuffer, pipelineBindPoint,
-        layout, firstSet,
-        descriptorSetCount, pDescriptorSets,
-        dynamicOffsetCount, pDynamicOffsets
-    );
-}
-
-void VKAPI_CALL water_chika_debug_layer_CmdDispatch(
-    VkCommandBuffer commandBuffer,
-    uint32_t groupCountX,
-    uint32_t groupCountY,
-    uint32_t groupCountZ
-) {
-    return water_chika_debug_device_layer::CmdDispatch(commandBuffer, groupCountX, groupCountY, groupCountZ);
-}
-VkResult VKAPI_CALL water_chika_debug_layer_BeginCommandBuffer(
-    VkCommandBuffer commandBuffer,
-    const VkCommandBufferBeginInfo* pBeginInfo
-) {
-    return water_chika_debug_device_layer::BeginCommandBuffer(commandBuffer, pBeginInfo);
-}
-VkResult VKAPI_CALL water_chika_debug_layer_EndCommandBuffer(
-    VkCommandBuffer commandBuffer
-) {
-    return water_chika_debug_device_layer::EndCommandBuffer(commandBuffer);
-}
-
-auto get_device_layer_procs() {
-    std::unordered_map<std::string, void*> funcs{
-        {"vkGetDeviceProcAddr", (void*)water_chika_debug_layer_GetDeviceProcAddr},
-        {"vkMapMemory", (void*)water_chika_debug_layer_MapMemory},
-        {"vkUnmapMemory", (void*)water_chika_debug_layer_UnmapMemory},
-        {"vkFlushMappedMemoryRanges", (void*)water_chika_debug_layer_FlushMappedMemoryRanges},
-        //{"vkInvalidateMappedMemoryRanges", (void*)water_chika_debug_layer_InvalidateMappedMemoryRanges},
-
-        {"vkCreateGraphicsPipelines", (void*)water_chika_debug_layer_CreateGraphicsPipelines},
-        {"vkCreateRayTracingPipelinesKHR", (void*)water_chika_debug_layer_CreateRayTracingPipelinesKHR},
-        {"vkCreateComputePipelines", (void*)water_chika_debug_layer_CreateComputePipelines},
-        {"vkDestroyPipeline", (void*)water_chika_debug_layer_DestroyPipeline},
-
-        {"vkCreateShaderModule", (void*)water_chika_debug_layer_CreateShaderModule },
-        {"vkDestroyShaderModule", (void*)water_chika_debug_layer_DestroyShaderModule},
-
-        {"vkGetDeviceQueue", (void*)water_chika_debug_layer_GetDeviceQueue},
-        {"vkQueuePresentKHR", (void*)water_chika_debug_layer_QueuePresentKHR},
-
-        {"vkCreateCommandPool", (void*)water_chika_debug_layer_CreateCommandPool},
-        {"vkResetCommandPool", (void*)water_chika_debug_layer_ResetCommandPool},
-        {"vkDestroyCommandPool", (void*)water_chika_debug_layer_DestroyCommandPool},
-        {"vkAllocateCommandBuffers", (void*)water_chika_debug_layer_AllocateCommandBuffers},
-        {"vkResetCommandBuffer", (void*)water_chika_debug_layer_ResetCommandBuffer},
-        {"vkFreeCommandBuffers", (void*)water_chika_debug_layer_FreeCommandBuffers},
-
-        {"vkQueueSubmit", (void*)water_chika_debug_layer_QueueSubmit},
-        {"vkAllocateMemory", (void*)water_chika_debug_layer_AllocateMemory},
-        {"vkFreeMemory", (void*)water_chika_debug_layer_FreeMemory},
-        {"vkBindBufferMemory", (void*)water_chika_debug_layer_BindBufferMemory},
-
-        {"vkCmdBindIndexBuffer", (void*)water_chika_debug_layer_CmdBindIndexBuffer},
-        {"vkCmdDrawIndexed", (void*)water_chika_debug_layer_CmdDrawIndexed},
-        {"vkCmdBindPipeline", (void*)water_chika_debug_layer_CmdBindPipeline},
-        {"vkCmdBindVertexBuffers", (void*)water_chika_debug_layer_CmdBindVertexBuffers},
-        {"vkCmdPushConstants", (void*)water_chika_debug_layer_CmdPushConstants},
-        {"vkCmdBindDescriptorSets", (void*)water_chika_debug_layer_CmdBindDescriptorSets},
-        {"vkCmdDispatch", (void*)water_chika_debug_layer_CmdDispatch},
-
-        {"vkBeginCommandBuffer", (void*)water_chika_debug_layer_BeginCommandBuffer},
-        {"vkEndCommandBuffer", (void*)water_chika_debug_layer_EndCommandBuffer},
-    };
-    return funcs;
-}
 auto get_instance_layer_procs() {
     std::unordered_map<std::string, void*> funcs{
         std::pair<std::string,void*>{std::string{"vkGetInstanceProcAddr"}, (void*)water_chika_debug_layer_GetInstanceProcAddr},
@@ -1488,10 +1248,12 @@ auto get_instance_layer_procs() {
     return funcs;
 }
 
+#include <device_dispatch.hpp>
+
 extern "C" DLLEXPORT PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetDeviceProcAddr(
     VkDevice device, const char* pName
 ) {
-    auto funcs = get_device_layer_procs();
+    auto funcs = get_device_procs();
     if (funcs.contains(pName)) {
         return reinterpret_cast<PFN_vkVoidFunction>(funcs[pName]);
     }
