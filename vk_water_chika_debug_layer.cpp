@@ -17,6 +17,8 @@
 #include <vulkan/vulkan_beta.h>
 #include <vk_cmd_buf_split_info.hpp>
 
+#undef max
+
 struct type_next {
     VkStructureType sType;
     type_next* pNext;
