@@ -22,9 +22,10 @@ def generate(file, output):
                 else:
                     print("", file=output)
                     first_param = False
-                print("    ", "".join(param.itertext()).replace("VkRefreshObjectListKHR", "void"), end="", file=output)
+                print("   ", "".join(param.itertext()).replace("VkRefreshObjectListKHR", "void"), end="", file=output)
                 param_names += param.find("name").text
             print(") {", file=output)
+            print("    std::cerr << \"could not split {}\" << std::endl;".format(name.text), file=output)
             print("    could_split = false;", file=output)
             print("    auto next_call = reinterpret_cast<PFN_{0}>(reinterpret_cast<T*>(this)->get_next_device_proc_addr(\"{0}\"));".format(name.text), file=output)
             print("    return next_call({});".format(param_names), file=output)

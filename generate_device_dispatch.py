@@ -3,14 +3,32 @@ import sys
 import argparse
 
 def should_override(command):
+    apis = ['vulkan',]
+    if 'api' in command.attrib:
+        apis = command.attrib['api'].split(',')
     ret_type = command.find('proto/type')
     name = command.find('proto/name')
     params = command.findall('param')
     names = {
             "vkGetDeviceProcAddr",
-            "vkCreateCommandPool"
+            "vkCreateCommandPool",
+            "vkCreateGraphicsPipelines",
+            "vkCreateRayTracingPipelinesKHR",
+            "vkCreateComputePipelines",
+            "vkDestroyPipeline",
+            "vkCreateShaderModule",
+            "vkDestroyShaderModule",
+            "vkGetDeviceQueue",
+            "vkCreateCommandPool",
+            "vkResetCommandPool",
+            "vkDestroyCommandPool",
+            "vkAllocateCommandBuffers",
+            "vkFreeCommandBuffers",
+            "vkQueueSubmit",
+            "vkBeginCommandBuffer",
+            "vkEndCommandBuffer"
              }
-    return name != None and ret_type != None and params != None and (('cmdbufferlevel' in command.attrib) and name.text != 'vkCmdRefreshObjectsKHR' or (name.text in names))
+    return name != None and ret_type != None and params != None and ('vulkan' in apis) and (('cmdbufferlevel' in command.attrib) and name.text != 'vkCmdRefreshObjectsKHR' or (name.text in names))
 
 def generate_dispatch(output):
     tree = ET.parse(file)
@@ -33,10 +51,13 @@ def generate_dispatch(output):
                 print("    ", "".join(param.itertext()).replace("VkRefreshObjectListKHR", "void"), end="", file=output)
                 param_names += param.find("name").text
             print(") {", file=output)
-            if 'cmdbufferlevel' in command.attrib or len(params) > 0 and params[0].find('type').text == 'VkCommandBuffer':
+            first_param_type = params[0].find('type').text
+            if 'cmdbufferlevel' in command.attrib or len(params) > 0 and first_param_type == 'VkCommandBuffer':
                 print("    auto& layer = water_chika_debug_command_buffer_info::g_command_buffers[commandBuffer];", file=output)
-            else:
+            elif first_param_type == 'VkDevice':
                 print("    auto& layer = water_chika_debug_device_layer::g_devices[device];", file=output)
+            elif first_param_type == 'VkQueue':
+                print("    auto& layer = water_chika_debug_device_layer::g_devices[water_chika_debug_device_layer::g_queues[queue]];", file=output)
             print("    return layer.{}({});".format(name.text[2:], param_names), file=output)
             print("}", file=output)
 
