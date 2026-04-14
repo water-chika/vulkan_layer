@@ -120,11 +120,11 @@ public:
         bool split_this = false;
         if (decode_start && !m_decode_enabled) {
             m_decode_enabled = true;
-            //split_this = true;
+            split_this = true;
         }
         else if (decode_end && m_decode_enabled) {
             m_decode_enabled = false;
-            //split_this = true;
+            split_this = true;
         }
 
         if (could_split) {
