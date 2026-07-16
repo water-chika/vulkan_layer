@@ -1014,6 +1014,34 @@ auto get_instance_layer_procs() {
 
 #include <device_dispatch.hpp>
 
+using cpp_helper::configure;
+using cpp_helper::empty_configure;
+
+struct temp_parent {
+    temp_parent() {
+    }
+    auto get_get_instance_proc_addr() {
+        return water_chika_debug_layer_GetInstanceProcAddr;
+    }
+    auto get_get_device_proc_addr() {
+        return water_chika_debug_layer_GetDeviceProcAddr;
+    }
+};
+
+template<typename T>
+class add_negotiate_loader_layer_interface_version : public T {
+public:
+    using parent = T;
+    add_negotiate_loader_layer_interface_version() : parent{} {
+    }
+    VkResult negotiate_loader_layer_interface_version(VkNegotiateLayerInterface* version_struct) {
+        version_struct->loaderLayerInterfaceVersion;
+        version_struct->pfnGetInstanceProcAddr = parent::get_get_instance_proc_addr();
+        version_struct->pfnGetDeviceProcAddr = parent::get_get_device_proc_addr();
+        return VK_SUCCESS;
+    }
+};
+
 extern "C" DLLEXPORT PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetDeviceProcAddr(
     VkDevice device, const char* pName
 ) {
@@ -1037,9 +1065,11 @@ extern "C" DLLEXPORT PFN_vkVoidFunction VKAPI_CALL water_chika_debug_layer_GetIn
 extern "C" DLLEXPORT VkResult VKAPI_CALL water_chika_debug_layer_NegotiateLoaderLayerInterfaceVersion(
     VkNegotiateLayerInterface* pVersionStruct
 ){
-    pVersionStruct->loaderLayerInterfaceVersion;
-    pVersionStruct->pfnGetInstanceProcAddr = water_chika_debug_layer_GetInstanceProcAddr;
-    pVersionStruct->pfnGetDeviceProcAddr = water_chika_debug_layer_GetDeviceProcAddr;
-    return VK_SUCCESS;
+    auto layer =
+        add_negotiate_loader_layer_interface_version<
+        temp_parent
+        >
+    {};
+    return layer.negotiate_loader_layer_interface_version(pVersionStruct);
 }
 
